@@ -592,10 +592,19 @@ REGIME_LIMITS = [
 
 
 def jev_market_check(state: str) -> Optional[dict]:
-    """Classification Jev du régime de marché — chaîne primaire puis fallback."""
+    """Classification Jev du régime de marché + COURBE d'escalade multi-horizons
+    (1h/4h/12h/48h). Vend la term structure, pas un champ unique.
+    Chaîne primaire typesafe puis fallback tokenra."""
     questions = {
-        "regime": {"type": "choice", "options": ["calm", "volatile", "stress", "crisis"]},
-        "escalates_48h": {"type": "noul"},
+        "regime": {"type": "choice", "criteria": {
+            "calm": "Normal trading, low contagion risk between tech equities and crypto",
+            "volatile": "Elevated moves, contagion possible but orderly",
+            "stress": "Active tech-to-crypto contagion, infrastructure/liquidity strain",
+            "crisis": "Dislocation, forced selling, stablecoin or exchange stress"}},
+        "escalade_1h": {"type": "noul", "instructions": "Probability market stress increases within 1 hour"},
+        "escalade_4h": {"type": "noul", "instructions": "Probability market stress increases within 4 hours"},
+        "escalade_12h": {"type": "noul", "instructions": "Probability market stress increases within 12 hours"},
+        "escalade_48h": {"type": "noul", "instructions": "Probability market stress increases within 48 hours"},
     }
     attempts = []
     if TYPESAFE_API_KEY:
@@ -610,7 +619,10 @@ def jev_market_check(state: str) -> Optional[dict]:
             return {
                 "regime": a["regime"]["choice"],
                 "confidence": a["regime"]["confidence"],
-                "escalade_48h": a["escalates_48h"]["noul"],
+                "escalade_1h": round(a["escalade_1h"]["noul"], 3),
+                "escalade_4h": round(a["escalade_4h"]["noul"], 3),
+                "escalade_12h": round(a["escalade_12h"]["noul"], 3),
+                "escalade_48h": round(a["escalade_48h"]["noul"], 3),
                 "model": body.get("model", model),
                 "via": via,
             }
@@ -642,6 +654,13 @@ def check_market(live_jev: bool = False) -> dict:
     age = int(dt.datetime.now(dt.timezone.utc).timestamp() - snap_dt.timestamp())
 
     checks_failed = [] if jev else ["jev_semantic"]
+    # courbe d'escalade — accepte les deux orthographes stockées (escal48h legacy, escalade_*)
+    curve = {
+        "h1": (jev or {}).get("escalade_1h"),
+        "h4": (jev or {}).get("escalade_4h"),
+        "h12": (jev or {}).get("escalade_12h"),
+        "h48": (jev or {}).get("escalade_48h", (jev or {}).get("escal48h")),
+    }
     payload = {
         "market_verdict": verdict,
         "score_global": g,
@@ -651,7 +670,8 @@ def check_market(live_jev: bool = False) -> dict:
         "fng": (snap.get("fng") or {}).get("value"),
         "jev_regime": (jev or {}).get("regime"),
         "jev_confidence": (jev or {}).get("confidence", (jev or {}).get("conf")),
-        "escalade_48h": (jev or {}).get("escalade_48h", (jev or {}).get("escal48h")),
+        "escalade_curve": curve,
+        "escalade_48h": curve["h48"],
         "jev_model": (jev or {}).get("model"),
         "jev_refreshed": jev_live_ok if live_jev else False,
         "snapshot_ts": snap["ts"],
