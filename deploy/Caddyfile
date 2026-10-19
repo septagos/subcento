@@ -1,14 +1,25 @@
-# Subcento Caddyfile PRODUCTION — grammaire VALIDÉE fonctionnellement le 2026-10-17
-# (build xcaddy + test 402/Payment-Required lors du réhearsal local, dry_run)
+# Subcento Caddyfile PRODUCTION — v1.3 : paywall par route (multi-blocs x402)
 # Binaire requis : caddy compilé AVEC le module :
 #   xcaddy build --with github.com/algorandecosystem/caddy-x402avm
-# Prérequis d'activation :
-#   - pay_to = wallet USDC de production (0xf6A9eFEc…cB08e) — injecté 2026-10-17, EIP-55 vérifié, hors OFAC
-#   - network base = Base Mainnet ; dry_run true uniquement en staging
-#   - le bloc doit vivre dans `route {}` (directive non ordonné)
-#   - `except` est une regex ANCRÉE
+# Le module supporte plusieurs blocs x402 auto-contenus, un par route enveloppante.
+# Order : /regime d'abord (0.0001), puis bloc générique tout le reste (0.002).
+# except = regex ANCRÉE : découverte gratuite, tout le reste payant.
 
 subcento.alterfield.com {
+	route /regime {
+		x402 {
+			accept {
+				pay_to 0xf6A9eFEc928D1253Be36e1Cd2f50f9b3997cB08e
+				price 0.0001
+				network base
+			}
+			facilitator_url https://facilitator.goplausible.xyz
+			description "Signed market-stress verdict: deterministic cross-asset seismograph score + Jev regime label"
+			mime_type application/json
+		}
+		reverse_proxy 127.0.0.1:5000
+	}
+
 	route {
 		x402 {
 			accept {
@@ -20,9 +31,6 @@ subcento.alterfield.com {
 			description "Pre-flight transaction verification for AI agents (signed verdict, <100ms cached)"
 			mime_type application/json
 			except "^(|/|/health|/llms.txt|/openapi.json|/favicon.ico)$"
-			# ^ regex ANCRÉE : découverte gratuite (/ , /health , /llms.txt , /openapi.json , /favicon.ico), tout le reste payant.
-			# sans les ancres ^...$, except / dégate silencieusement l'intégralité du site.
-			# dry_run true   # <-- staging uniquement
 		}
 		reverse_proxy 127.0.0.1:5000
 	}

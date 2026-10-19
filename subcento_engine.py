@@ -14,7 +14,8 @@ import os
 import json
 import time
 import hashlib
-from typing import Any
+import datetime as dt
+from typing import Any, Optional
 import requests
 
 # --- Configuration ---
@@ -570,6 +571,105 @@ def check_transaction(
     verdict["latency_ms"] = round((time.time() - t0) * 1000, 1)
 
     return verdict
+
+
+# ---------------------------------------------------------------------------
+# 5. /regime — marché lu par Jev + score sismique déterministe (v1.3, 19/10/26)
+# ---------------------------------------------------------------------------
+# Le capteur armée (seismo, cycle 30 min) écrit etat.json sur ce VPS.
+# /regime vend une lecture SIGNÉE de ce snapshot : score déterministe (arithmo
+# jamais deleguee a l'LLM) + étiquette de regime Jev (shadow-mode -> produit).
+# live_jev=true rafraîchit la classification Jev à la demande (~150-400ms,
+# ~0.000015 $) ; par défaut on ressert l'étiquette du dernier cycle -> $0.
+
+SEISMO_ETAT_PATH = os.environ.get("SEISMO_ETAT", "/var/lib/svarog/seismo/etat.json")
+
+REGIME_LIMITS = [
+    "shows: aggregate market stress at snapshot time (cross-asset seismograph + Jev regime label)",
+    "does not show: a price prediction for any specific asset",
+    "does not show: that any work followed the payment",
+]
+
+
+def jev_market_check(state: str) -> Optional[dict]:
+    """Classification Jev du régime de marché — chaîne primaire puis fallback."""
+    questions = {
+        "regime": {"type": "choice", "options": ["calm", "volatile", "stress", "crisis"]},
+        "escalates_48h": {"type": "noul"},
+    }
+    attempts = []
+    if TYPESAFE_API_KEY:
+        attempts.append((TYPESAFE_API_URL, TYPESAFE_API_KEY, JEV_MODEL, "typesafe"))
+    if TOKENRA_API_KEY:
+        attempts.append((JEV_FALLBACK_URL, TOKENRA_API_KEY, "jev-latest", "tokenra-fallback"))
+    for url, key, model, via in attempts:
+        payload = {"model": model, "state": state, "questions": questions}
+        try:
+            body = _jev_post(url, key, payload, timeout=4.0)
+            a = body["answers"]
+            return {
+                "regime": a["regime"]["choice"],
+                "confidence": a["regime"]["confidence"],
+                "escalade_48h": a["escalates_48h"]["noul"],
+                "model": body.get("model", model),
+                "via": via,
+            }
+        except Exception as e:
+            print(f"[Jev-regime:{via}] error: {e}")
+    return None
+
+
+def check_market(live_jev: bool = False) -> dict:
+    t0 = time.time()
+    with open(SEISMO_ETAT_PATH) as f:
+        snap = json.load(f)
+
+    score = snap.get("score") or {}
+    g = score.get("global")
+    if g is None:
+        raise ValueError("snapshot seismo sans score")
+    verdict = "BLOCK" if g >= 75 else ("CAUTION" if g >= 45 else "SAFE")
+
+    jev_stored = snap.get("jev") or {}
+    if live_jev:
+        jev = jev_market_check(json.dumps(snap, sort_keys=True)[:4000]) or (jev_stored or None)
+        jev_live_ok = jev is not None
+    else:
+        jev = jev_stored or None
+        jev_live_ok = False
+
+    snap_dt = dt.datetime.fromisoformat(snap["ts"].replace("Z", "+00:00"))
+    age = int(dt.datetime.now(dt.timezone.utc).timestamp() - snap_dt.timestamp())
+
+    checks_failed = [] if jev else ["jev_semantic"]
+    payload = {
+        "market_verdict": verdict,
+        "score_global": g,
+        "zone": score.get("zone"),
+        "components": score.get("components"),
+        "btc_exchange_spread_pct": (snap.get("btc_spread") or {}).get("disp"),
+        "fng": (snap.get("fng") or {}).get("value"),
+        "jev_regime": (jev or {}).get("regime"),
+        "jev_confidence": (jev or {}).get("confidence", (jev or {}).get("conf")),
+        "escalade_48h": (jev or {}).get("escalade_48h", (jev or {}).get("escal48h")),
+        "jev_model": (jev or {}).get("model"),
+        "jev_refreshed": jev_live_ok if live_jev else False,
+        "snapshot_ts": snap["ts"],
+        "age_seconds": age,
+        "timestamp": int(time.time()),
+        "source": "subcento-seismo-v1",
+        "evaluation_status": "measured" if jev else "not-measured",
+        "checks_failed": checks_failed,
+        "limits": REGIME_LIMITS,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode()).digest()
+    sig_hex = SIGNING_KEY.sign(digest).signature.hex()
+
+    payload["signature"] = sig_hex
+    payload["verify_key"] = VERIFY_KEY_HEX
+    payload["latency_ms"] = round((time.time() - t0) * 1000, 1)
+    return payload
 
 
 if __name__ == "__main__":

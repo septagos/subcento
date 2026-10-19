@@ -6,7 +6,7 @@ Cette API Flask sert la logique métier derrière le paywall.
 """
 
 from flask import Flask, request, jsonify
-from subcento_engine import check_transaction, VERIFY_KEY_HEX
+from subcento_engine import check_transaction, check_market, VERIFY_KEY_HEX
 
 app = Flask(__name__)
 
@@ -16,14 +16,15 @@ def index():
     """Page de découverte M2M (servie sans paiement via x402)."""
     return jsonify({
         "name": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "description": (
             "Verifies an on-chain transaction before an AI agent signs it. "
             "Returns SAFE | CAUTION | BLOCK with signed evidence in <100ms. "
-            "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits."
+            "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits. "
+            "v1.3: POST /regime — signed market-stress verdict (seismograph + Jev regime)."
         ),
         "pricing_model": "x402",
-        "cost_per_request_usdc": "0.002",
+        "cost_per_request_usdc": {"POST /check": "0.002", "POST /regime": "0.0001"},
         "endpoints": [
             {
                 "path": "/check",
@@ -36,6 +37,14 @@ def index():
                     "chain_id": "int (optional, default 8453 = Base)",
                     "intent": "string (optional — declared agent intent; enables 3-in-1 intent-match diagnostic)",
                     "nonce": "string (optional — ERC-3009 bytes32 you intend to spend; verdict becomes nonce-bound)",
+                },
+            },
+            {
+                "path": "/regime",
+                "method": "POST",
+                "description": "Signed market-stress verdict: cross-asset seismograph score + Jev regime label",
+                "body": {
+                    "live_jev": "bool (optional, default false — true refreshes the Jev classification now, ~300ms)",
                 },
             }
         ],
@@ -76,6 +85,24 @@ def health():
     return jsonify({"status": "ok", "verify_key": VERIFY_KEY_HEX})
 
 
+@app.route("/regime", methods=["POST"])
+def regime():
+    """
+    Endpoint payant (x402: 0.0001 USDC) — lecture signée du marché.
+    Score sismique déterministe (30 min de fraîcheur max) + classification
+    de régime par Jev (TypeSafe). Fail-soft: sans Jev, evaluation_status
+    = not-measured, jamais un faux SAFE.
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    live = bool(data.get("live_jev", False))
+    try:
+        return jsonify(check_market(live_jev=live))
+    except FileNotFoundError:
+        return jsonify({"error": "market snapshot unavailable (seismo cycle pending)"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 CHECK_SCHEMA = {
     "type": "object",
     "required": ["to"],
@@ -110,6 +137,34 @@ VERDICT_SCHEMA = {
 
 import struct as _struct
 
+REGIME_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "live_jev": {"type": "boolean", "description": "Refresh the Jev regime classification at request time (~300ms, default false)", "default": False},
+    },
+}
+
+REGIME_VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "market_verdict": {"type": "string", "enum": ["SAFE", "CAUTION", "BLOCK"]},
+        "score_global": {"type": "number", "description": "Deterministic cross-asset stress score 0-100"},
+        "zone": {"type": "string", "description": "calme | tendu | alarme"},
+        "components": {"type": "object", "description": "Per-engine scores (fx, crypto, btc_disp, equities, rates, vix, fng)"},
+        "btc_exchange_spread_pct": {"type": ["number", "null"], "description": "Max BTC price divergence across exchanges"},
+        "jev_regime": {"type": ["string", "null"], "enum": ["calm", "volatile", "stress", "crisis", None]},
+        "escalade_48h": {"type": ["number", "null"], "description": "Jev noul: probability stress escalates within 48h"},
+        "snapshot_ts": {"type": "string", "description": "UTC capture time of the underlying seismograph snapshot"},
+        "age_seconds": {"type": "integer", "description": "Freshness of the snapshot at verdict time (<1800 guaranteed)"},
+        "evaluation_status": {"type": "string", "enum": ["measured", "not-measured"]},
+        "timestamp": {"type": "integer"},
+        "signature": {"type": "string", "description": "Ed25519 over the canonical regime digest"},
+        "verify_key": {"type": "string"},
+        "latency_ms": {"type": "number"},
+        "limits": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
 
 def _build_favicon() -> bytes:
     """ICO 16x16x32 — carré vert Subcento, généré sans dépendance."""
@@ -133,7 +188,7 @@ OPENAPI = {
     "openapi": "3.1.0",
     "info": {
         "title": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "contact": {
             "name": "Subcento — operated by Alterfield",
             "url": "https://subcento.alterfield.com",
@@ -155,7 +210,10 @@ OPENAPI = {
             "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico — never pay for discovery. "
             "To make a verdict citable as a pre-settlement precondition, send the ERC-3009 nonce you intend to spend "
             "in the request: the signed verdict then binds to it and opens against exactly one settlement. "
-            "A BLOCK whose evaluation_status is not-measured means the verifier was blind, not that you are guilty."
+            "A BLOCK whose evaluation_status is not-measured means the verifier was blind, not that you are guilty. "
+            "For market context, POST /regime (0.0001 USDC) returns a signed market-stress verdict: deterministic "
+            "cross-asset seismograph score + Jev regime label (calm|volatile|stress|crisis) + 48h escalation noul. "
+            "Default body {} is fine; {\"live_jev\": true} refreshes the Jev classification at request time."
         ),
     },
     "extensions": {
@@ -200,6 +258,24 @@ OPENAPI = {
                 },
             }
         },
+        "/regime": {
+            "post": {
+                "summary": "Signed market-stress verdict (paid, 0.0001 USDC)",
+                "requestBody": {
+                    "required": False,
+                    "content": {"application/json": {"schema": REGIME_SCHEMA}},
+                },
+                "responses": {
+                    "200": {"description": "Signed regime verdict", "content": {"application/json": {"schema": REGIME_VERDICT_SCHEMA}}},
+                    "402": {"description": "Payment Required"},
+                    "503": {"description": "Snapshot unavailable"},
+                },
+                "x-payment-info": {
+                    "price": {"mode": "fixed", "currency": "USD", "amount": "0.0001"},
+                    "protocols": [{"x402": {}}],
+                },
+            }
+        },
     },
 }
 
@@ -229,6 +305,15 @@ facilitator https://facilitator.goplausible.xyz, maxTimeout 60s.
 
 ### GET / — free machine-readable discovery card
 ### GET /health — free liveness + verify_key
+
+### POST /regime (x402 paywall — 0.0001 USDC)
+Body: `{}` or `{"live_jev": true}` to refresh the Jev classification now.
+Returns a signed market-stress verdict: deterministic cross-asset seismograph
+score (0-100, SAFE <45 ≤ CAUTION <75 ≤ BLOCK), Jev regime label
+(calm|volatile|stress|crisis) and 48h escalation noul, snapshot freshness
+(`age_seconds`, always <1800). x402 terms: network eip155:8453, amount 100
+(micro-USDC = $0.0001), same facilitator. This is aggregate market stress —
+not a price prediction, not advice.
 
 ## Docs
 - Root: https://subcento.alterfield.com/ (full OpenAPI-ish discovery JSON)
