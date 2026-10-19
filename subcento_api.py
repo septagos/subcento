@@ -16,10 +16,11 @@ def index():
     """Page de découverte M2M (servie sans paiement via x402)."""
     return jsonify({
         "name": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.0.0",
+        "version": "1.2.0",
         "description": (
             "Verifies an on-chain transaction before an AI agent signs it. "
-            "Returns SAFE | CAUTION | BLOCK with signed evidence in <100ms."
+            "Returns SAFE | CAUTION | BLOCK with signed evidence in <100ms. "
+            "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits."
         ),
         "pricing_model": "x402",
         "cost_per_request_usdc": "0.002",
@@ -34,6 +35,7 @@ def index():
                     "value": "int (wei, optional, default 0)",
                     "chain_id": "int (optional, default 8453 = Base)",
                     "intent": "string (optional — declared agent intent; enables 3-in-1 intent-match diagnostic)",
+                    "nonce": "string (optional — ERC-3009 bytes32 you intend to spend; verdict becomes nonce-bound)",
                 },
             }
         ],
@@ -56,12 +58,14 @@ def check():
     value = int(data.get("value", 0) or 0)  # tolère les clients qui envoient une string
     chain_id = int(data.get("chain_id", 8453))
     intent = data.get("intent")  # optionnel : intention déclarée (diagnostic 3-en-1)
+    nonce = data.get("nonce")  # optionnel : bytes32 ERC-3009 => verdict nonce-bound
 
     if not to:
         return jsonify({"error": "'to' address required"}), 400
 
     try:
-        verdict = check_transaction(to, calldata, value, chain_id, declared_intent=intent)
+        verdict = check_transaction(to, calldata, value, chain_id,
+                                    declared_intent=intent, nonce=nonce)
         return jsonify(verdict)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -81,6 +85,7 @@ CHECK_SCHEMA = {
         "value": {"type": "integer", "description": "Wei sent (optional, default 0)", "minimum": 0},
         "chain_id": {"type": "integer", "description": "Chain id (optional, default 8453 = Base)", "default": 8453},
         "intent": {"type": "string", "description": "Declared agent intent — enables the Jev 3-in-1 intent-match diagnostic"},
+        "nonce": {"type": "string", "description": "Optional ERC-3009 bytes32 nonce (0x + 64 hex) the caller intends to spend; when present the signed verdict is nonce-bound and opens against exactly one settlement", "pattern": "^0x[0-9a-fA-F]{64}$"},
     },
 }
 
@@ -90,8 +95,15 @@ VERDICT_SCHEMA = {
         "verdict": {"type": "string", "enum": ["SAFE", "CAUTION", "BLOCK"]},
         "reasons": {"type": "array", "items": {"type": "string"}},
         "latency_ms": {"type": "number"},
-        "layers": {"type": "object", "description": "Per-layer evidence (GoPlus risk, OFAC, Jev semantics, deterministic checks)"},
-        "signature": {"type": "string", "description": "Ed25519 signature over the canonical verdict digest"},
+        "value": {"type": "integer", "description": "Signed: wei in the payment shape"},
+        "chain_id": {"type": "integer", "description": "Signed: chain the verdict is valid on (anti cross-chain replay)"},
+        "timestamp": {"type": "integer", "description": "Signed issue time, unix seconds. Ordering rule: a verdict counts as pre-flight only when strictly before the settlement block timestamp; equal does not count."},
+        "binding": {"type": "object", "description": "Signed. {kind: 'nonce-bound', nonce: '0x…64'} when the caller supplied the ERC-3009 nonce — verdict then opens against exactly one settlement, never a second identical payment. {kind: 'shape-bound'} otherwise — never upgradeable to a per-payment claim.", "properties": {"kind": {"type": "string", "enum": ["nonce-bound", "shape-bound"]}, "nonce": {"type": "string"}}},
+        "evaluation_status": {"type": "string", "enum": ["measured", "not-measured"], "description": "not-measured means a required trust layer could not run (see checks_failed); a BLOCK with not-measured is gate conservatism, not evidence of danger, and must not count as a negative signal about the agent"},
+        "checks_failed": {"type": "array", "items": {"type": "string"}, "description": "Layers that could not run (goplus, ofac_blocklist, jev_semantic)"},
+        "limits": {"type": "array", "items": {"type": "string"}, "description": "Signed: what this verdict does and does not show"},
+        "layers": {"type": "object", "description": "Per-layer evidence (GoPlus risk, OFAC, Jev semantics, deterministic checks) — unsigned advisory detail"},
+        "signature": {"type": "string", "description": "Ed25519 signature over the canonical digest of the signed payload (verdict, to, function, value, reasons, timestamp, chain_id, binding, evaluation_status, checks_failed, limits)"},
         "verify_key": {"type": "string", "description": "Hex Ed25519 verify key (also at /health)"},
     },
 }
@@ -121,7 +133,7 @@ OPENAPI = {
     "openapi": "3.1.0",
     "info": {
         "title": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "contact": {
             "name": "Subcento — operated by Alterfield",
             "url": "https://subcento.alterfield.com",
@@ -130,7 +142,9 @@ OPENAPI = {
         "description": (
             "Verifies an on-chain transaction BEFORE an AI agent signs it. Four layers: "
             "GoPlus address risk, OFAC blocklist, Jev (TypeSafe AI) semantic calldata analysis, "
-            "deterministic checks. Ed25519-signed verdict. Fail-closed: unreachable trust layers => BLOCK, never a false SAFE."
+            "deterministic checks. Ed25519-signed verdict. Fail-closed: unreachable trust layers => BLOCK, never a false SAFE. "
+            "v1.2: every verdict carries a binding (nonce-bound opens against exactly one settlement, shape-bound never upgrades), "
+            "an evaluation_status (measured | not-measured, so a blind BLOCK is never read as evidence of danger), and signed limits."
         ),
         "x-guidance": (
             "Call POST /check before signing any Base/EVM transaction. Unpaid calls return HTTP 402 with a "
@@ -138,7 +152,10 @@ OPENAPI = {
             "maxTimeout 60s) via facilitator https://facilitator.goplausible.xyz, then retry the identical request "
             "with the X-PAYMENT header. Include 'intent' to get the 3-in-1 semantic diagnostic "
             "(drainer probability, risk level, intent-match). Treat BLOCK as final; CAUTION deserves a human or a smaller probe. "
-            "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico — never pay for discovery."
+            "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico — never pay for discovery. "
+            "To make a verdict citable as a pre-settlement precondition, send the ERC-3009 nonce you intend to spend "
+            "in the request: the signed verdict then binds to it and opens against exactly one settlement. "
+            "A BLOCK whose evaluation_status is not-measured means the verifier was blind, not that you are guilty."
         ),
     },
     "extensions": {
@@ -219,6 +236,12 @@ facilitator https://facilitator.goplausible.xyz, maxTimeout 60s.
 ## Notes
 - Verdicts include `latency_ms`, `reasons[]`, `signature`, `verify_key`.
 - `intent` mismatch alone ⇒ CAUTION (anti false-positive), drainer probability > 0.7 ⇒ BLOCK.
+- v1.2: send the ERC-3009 `nonce` you intend to spend and the signed verdict is `nonce-bound`
+  (opens against exactly one settlement; a shape-bound verdict never upgrades).
+- `evaluation_status: not-measured` on a BLOCK means a trust layer could not run — gate
+  conservatism, not evidence. Never cite it as a negative signal about the agent.
+- Signature covers: verdict, to, function, value, reasons, timestamp, chain_id, binding,
+  evaluation_status, checks_failed, limits. Everything else in the response is advisory detail.
 """
 
 

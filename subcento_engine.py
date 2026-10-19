@@ -7,7 +7,7 @@ Pipeline :
   3. Couche sémantique Jev (interprète l'intention du calldata)
   4. Verdict final : SAFE | CAUTION | BLOCK, signé Ed25519
 
-Latence cible : <100 ms (verdicts mis en cache)/.
+Latence cible : <100 ms (verdicts mis en cache).
 """
 
 import os
@@ -343,6 +343,31 @@ def jev_semantic_check(decoded: dict, to: str, value: int, flags: list[str],
 # 4. VERDICT FINAL + SIGNATURE
 # ---------------------------------------------------------------------------
 
+# Limites déclarées embarquées dans le payload signé (convention "limits" des
+# vectors de conformance, discussion publique erc-8004#99) : ce qu'un verdict dit
+# et ne dit pas.
+VERDICT_LIMITS = [
+    "shows: transaction-shape risk (recipient, allowance, calldata heuristics) evaluated before execution",
+    "does not show: that any work followed the payment",
+    "does not show: counterparty honesty or producer intent",
+]
+
+
+def _normalize_nonce(nonce: str | None) -> str | None:
+    """Valide un nonce ERC-3009 bytes32 (0x + 64 hex). None si absent/invalide."""
+    if not nonce:
+        return None
+    n = nonce.strip().lower()
+    if len(n) != 66 or not n.startswith("0x"):
+        return None
+    body = n[2:]
+    if not all(c in "0123456789abcdef" for c in body):
+        return None
+    if body == "0" * 64:
+        return None  # nonce nul : non usage
+    return n
+
+
 def build_verdict(
     decoded: dict,
     to: str,
@@ -352,6 +377,9 @@ def build_verdict(
     jev: dict | None,
     ofac_hits: tuple = (),
     degraded: tuple = (),
+    checks_failed: tuple = (),
+    nonce: str | None = None,
+    chain_id: int = 8453,
 ) -> dict:
     """
     Agrège toutes les couches en un verdict final.
@@ -360,6 +388,10 @@ def build_verdict(
       - Jev high risk + drainer_prob > 0.7 → BLOCK
       - unlimited approval + contrat inconnu → CAUTION
       - Sinon → SAFE
+    v1.2 : binding (nonce-bound vs shape-bound), evaluation_status mesuré
+    ou non (règle NOT_MEASURED de la discussion erc-8004#99), limites embarquées.
+    Le gate reste fail-closed strict : une couche injoignable donne BLOCK,
+    mais le verdict dit désormais POURQUOI (dangereux vs aveugle).
     """
     reasons = []
     block = False
@@ -429,13 +461,34 @@ def build_verdict(
     else:
         verdict = "SAFE"
 
-    # --- Signature Ed25519 du verdict ---
+    # v1.2 — binding : un verdict avec nonce ERC-3009 valide est "nonce-bound"
+    # (ouvrable contre exactement un règlement), sinon "shape-bound" (jamais
+    # promu, convention SHAPE_BOUND de la discussion erc-8004#99).
+    nonce_norm = _normalize_nonce(nonce)
+    if nonce_norm:
+        binding = {"kind": "nonce-bound", "nonce": nonce_norm}
+    else:
+        binding = {"kind": "shape-bound"}
+
+    # v1.2 — evaluation_status : "not-measured" si une couche de confiance
+    # requise (GoPlus, blocklist OFAC) n'a pas pu s'exécuter. Le gate BLOCK,
+    # mais le verdict distingue "dangereux" de "on n'a pas pu voir".
+    required_failed = [c for c in checks_failed if c in ("goplus", "ofac_blocklist")]
+    evaluation_status = "not-measured" if required_failed else "measured"
+
+    # --- Signature Ed25519 du verdict (payload canonique v1.2) ---
     verdict_payload = {
         "verdict": verdict,
         "to": to,
         "function": decoded["function"],
+        "value": int(value),
         "reasons": reasons,
         "timestamp": int(time.time()),
+        "chain_id": int(chain_id),
+        "binding": binding,
+        "evaluation_status": evaluation_status,
+        "checks_failed": sorted(checks_failed),
+        "limits": VERDICT_LIMITS,
     }
     canonical = json.dumps(verdict_payload, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(canonical.encode()).digest()
@@ -462,10 +515,13 @@ def check_transaction(
     value: int = 0,
     chain_id: int = 8453,
     declared_intent: str | None = None,
+    nonce: str | None = None,
 ) -> dict:
     """
     Vérifie une transaction avant signature.
     Retourne le verdict signé.
+    v1.2 : `nonce` (bytes32 ERC-3009, optionnel) rend le verdict nonce-bound,
+    ouvrable contre exactement un règlement futur (fil erc-8004#99).
     """
     t0 = time.time()
 
@@ -481,7 +537,8 @@ def check_transaction(
     ofac_hits = tuple(a for a in candidates if ofac_sanctioned(a))
     if ofac_hits:
         # BLOCK déterministe : aucun appel réseau nécessaire
-        verdict = build_verdict(decoded, to, value, flags, {}, None, ofac_hits)
+        verdict = build_verdict(decoded, to, value, flags, {}, None, ofac_hits,
+                                 nonce=nonce, chain_id=chain_id)
         verdict["ofac_hits"] = list(ofac_hits)
         verdict["latency_ms"] = round((time.time() - t0) * 1000, 1)
         return verdict
@@ -492,12 +549,24 @@ def check_transaction(
 
     # 4. Jev (si pas déjà un flag bloquant déterministe)
     jev = None
+    jev_attempted = bool(TYPESAFE_API_KEY or TOKENRA_API_KEY)
     if not goplus.get("is_drainer") and not goplus.get("is_blackmail") and not goplus.get("is_sanctioned"):
         jev = jev_semantic_check(decoded, to, value, flags, declared_intent)
 
+    # 4b. v1.2 — quelles couches n'ont pas pu s'exécuter (règle NOT_MEASURED)
+    failed = []
+    if goplus.get("unavailable"):
+        failed.append("goplus")
+    if _OFAC_ERROR:
+        failed.append("ofac_blocklist")
+    if jev_attempted and jev is None and not failed:
+        # tentative réelle + aucune donnée = échec réseau des endpoints sémantiques
+        failed.append("jev_semantic")
+
     # 5. Verdict final
     degraded = ("ofac_blocklist_unavailable_fail_closed",) if _OFAC_ERROR else ()
-    verdict = build_verdict(decoded, to, value, flags, goplus, jev, degraded=degraded)
+    verdict = build_verdict(decoded, to, value, flags, goplus, jev, degraded=degraded,
+                             checks_failed=tuple(failed), nonce=nonce, chain_id=chain_id)
     verdict["latency_ms"] = round((time.time() - t0) * 1000, 1)
 
     return verdict
