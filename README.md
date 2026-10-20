@@ -72,8 +72,10 @@ VerifyKey(v["verify_key"], HexEncoder).verify(digest, bytes.fromhex(v["signature
 - **Edge paywall, not app paywall.** Payment gating lives in Caddy via
   `caddy-x402avm` (`deploy/Caddyfile`) — the backend never sees unpaid traffic,
   and the Python app has zero payment code to audit.
-- **`<100 ms` cached, sub-second cold.** The Jev fan-out (drainer / risk / intent)
-  is one 3-in-1 call, not three.
+- **Measured latency (Oct 2026, our Frankfurt box):** `/regime` 30–140 ms;
+  `/check` ~1 s cold, ~0.3 s warm — Jev re-runs every call, GoPlus is the only
+  cached layer. The Jev fan-out (drainer / risk / intent) is one 3-in-1 call,
+  not three, and we'd keep it that way: budget ~1 s per fresh target, not ~10.
 - **Signature key never leaves the machine it was born on.** Generated once, on the
   production host, 600 perms. Split custody by design.
 - Run everything yourself: `pip install -r requirements.txt && gunicorn subcento_api:app`,

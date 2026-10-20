@@ -19,7 +19,8 @@ def index():
         "version": "1.3.0",
         "description": (
             "Verifies an on-chain transaction before an AI agent signs it. "
-            "Returns SAFE | CAUTION | BLOCK with signed evidence in <100ms. "
+            "Returns SAFE | CAUTION | BLOCK with signed evidence. /regime stays "
+            "under 150 ms; /check runs ~0.3 s warm, ~1 s cold (live trust-layer calls). "
             "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits. "
             "v1.3: POST /regime — signed market-stress verdict (seismograph + Jev regime)."
         ),
@@ -292,7 +293,8 @@ LLMS_TXT = """# Subcento
 
 > Pre-flight transaction verification for AI agents. Pay with x402 (0.002 USDC on
 > Base mainnet), get a signed verdict — SAFE | CAUTION | BLOCK — with evidence in
-> <100ms (cached) / <700ms (cold). Fail-closed: if trust layers are unreachable you
+> /regime under 150 ms; /check ~0.3 s warm / ~1 s cold (GoPlus + Jev run live per
+> request — only GoPlus is cached). Fail-closed: if trust layers are unreachable you
 > get BLOCK, never a false SAFE.
 
 ## Why an agent should call this before signing
