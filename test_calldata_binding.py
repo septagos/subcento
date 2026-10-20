@@ -6,7 +6,12 @@ Test d'INAM : tout est recompute, zero placeholder.
 """
 import hashlib
 import json
+import os
 import sys
+import tempfile
+
+os.environ.setdefault("SUBCENTO_KEY_PATH",
+                      os.path.join(tempfile.gettempdir(), "subcento_kit_test_signing.key"))
 
 import nacl.signing
 import nacl.encoding

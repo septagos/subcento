@@ -67,6 +67,14 @@ VerifyKey(v["verify_key"], HexEncoder).verify(digest, bytes.fromhex(v["signature
 # calldata via calldata_sha256 (normalized lowercase hex) — left Subcento untouched
 ```
 
+## Don't trust — verify, offline
+
+Every claim on this page ships as **5 production-signed fixtures plus runnable
+batteries** in [`doc/verification-kit/`](doc/verification-kit/README.md): the
+engine itself, the doctrine tests, an offline verifier that refuses any key not
+announced out-of-band (`/health`), and a byte-for-byte regeneration path under
+your own signing key. One dependency, zero blind trust.
+
 ## Architecture (the honest one)
 
 - **Edge paywall, not app paywall.** Payment gating lives in Caddy via

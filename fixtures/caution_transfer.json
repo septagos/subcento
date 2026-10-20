@@ -1,1 +1,41 @@
-{"binding":{"kind":"shape-bound"},"calldata_sha256":"3574b3017b7d6a66d198a6bfbf23cae2a372c7acd6f109e9c293303d8b327043","chain_id":8453,"checks_failed":[],"confidence":0.1,"evaluation_status":"measured","function":"transfer","goplus":{"flags":[],"is_blackmail":false,"is_contract":true,"is_drainer":false,"is_sanctioned":false},"jev":{"consistency":"unclear","drainer_prob":0.15,"model":"jev-1.14.0","risk_confidence":0.1,"risk_level":"medium","via":"typesafe"},"latency_ms":657.7,"limits":["shows: transaction-shape risk (recipient, allowance, calldata heuristics) evaluated before execution","does not show: that any work followed the payment","does not show: counterparty honesty or producer intent"],"reasons":["jev_risk_medium"],"signature":"5a0c8bf0feb3a93748eed7a02c573907e32966228074057d51ba26b8dc2772f203fbbc584bde992e71331aea7de3bb439af31f44b2e0cbd8f29e3377befa2404","timestamp":1792456111,"to":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","value":0,"verdict":"CAUTION","verify_key":"99d59000e66922a9076d3910d23857574f5670561d978f57144ba278d3d50256"}
+{
+  "binding": {
+    "kind": "shape-bound"
+  },
+  "calldata_sha256": "3574b3017b7d6a66d198a6bfbf23cae2a372c7acd6f109e9c293303d8b327043",
+  "chain_id": 8453,
+  "checks_failed": [],
+  "confidence": 0.1,
+  "evaluation_status": "measured",
+  "function": "transfer",
+  "goplus": {
+    "flags": [],
+    "is_blackmail": false,
+    "is_contract": true,
+    "is_drainer": false,
+    "is_sanctioned": false
+  },
+  "jev": {
+    "consistency": "unclear",
+    "drainer_prob": 0.15,
+    "model": "jev-1.14.0",
+    "risk_confidence": 0.1,
+    "risk_level": "medium",
+    "via": "typesafe"
+  },
+  "latency_ms": 657.7,
+  "limits": [
+    "shows: transaction-shape risk (recipient, allowance, calldata heuristics) evaluated before execution",
+    "does not show: that any work followed the payment",
+    "does not show: counterparty honesty or producer intent"
+  ],
+  "reasons": [
+    "jev_risk_medium"
+  ],
+  "signature": "5a0c8bf0feb3a93748eed7a02c573907e32966228074057d51ba26b8dc2772f203fbbc584bde992e71331aea7de3bb439af31f44b2e0cbd8f29e3377befa2404",
+  "timestamp": 1792456111,
+  "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "value": 0,
+  "verdict": "CAUTION",
+  "verify_key": "99d59000e66922a9076d3910d23857574f5670561d978f57144ba278d3d50256"
+}

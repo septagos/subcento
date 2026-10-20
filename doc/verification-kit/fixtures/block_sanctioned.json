@@ -1,0 +1,31 @@
+{
+  "binding": {
+    "kind": "shape-bound"
+  },
+  "calldata_sha256": "a54942c8e365f3784f38b8d437f9d708290db60738b00cdcfb934c32d1be97f3",
+  "chain_id": 8453,
+  "checks_failed": [],
+  "confidence": null,
+  "evaluation_status": "measured",
+  "function": "native_transfer",
+  "goplus": {},
+  "jev": null,
+  "latency_ms": 0.1,
+  "limits": [
+    "shows: transaction-shape risk (recipient, allowance, calldata heuristics) evaluated before execution",
+    "does not show: that any work followed the payment",
+    "does not show: counterparty honesty or producer intent"
+  ],
+  "ofac_hits": [
+    "0x0330070FD38Ec3bB94F58FA55D40368271E9e54A"
+  ],
+  "reasons": [
+    "ofac_sanctioned_address"
+  ],
+  "signature": "ed9e6bb5a3549def9e4c079221d576a340846b8299aeefc7ac8c503f4ac9e873f1047e231f20aa2cfe59e6138879e5ba7d03447085202c057b25c00367535d0a",
+  "timestamp": 1792456111,
+  "to": "0x0330070FD38Ec3bB94F58FA55D40368271E9e54A",
+  "value": 1000000000,
+  "verdict": "BLOCK",
+  "verify_key": "99d59000e66922a9076d3910d23857574f5670561d978f57144ba278d3d50256"
+}

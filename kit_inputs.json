@@ -1,0 +1,87 @@
+{
+ "block_sanctioned": {
+  "calldata": "0x",
+  "goplus": {},
+  "jev": null,
+  "latency_ms": 0.1,
+  "nonce": null,
+  "to": "0x0330070FD38Ec3bB94F58FA55D40368271E9e54A",
+  "ts": 1792456111,
+  "value": 1000000000
+ },
+ "caution_transfer": {
+  "calldata": "0xa9059cbb00000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000001",
+  "goplus": {
+   "flags": [],
+   "is_blackmail": false,
+   "is_contract": true,
+   "is_drainer": false,
+   "is_sanctioned": false
+  },
+  "jev": {
+   "consistency": "unclear",
+   "drainer_prob": 0.15,
+   "model": "jev-1.14.0",
+   "risk_confidence": 0.1,
+   "risk_level": "medium",
+   "via": "typesafe"
+  },
+  "latency_ms": 657.7,
+  "nonce": null,
+  "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "ts": 1792456111,
+  "value": 0
+ },
+ "jev_semantic_blind": {
+  "calldata": "0xa9059cbb00000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000001",
+  "goplus": {
+   "flags": [],
+   "is_blackmail": false,
+   "is_contract": true,
+   "is_drainer": false,
+   "is_sanctioned": false
+  },
+  "jev": null,
+  "latency_ms": 336.7,
+  "nonce": null,
+  "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "ts": 1792456229,
+  "value": 0
+ },
+ "nonce_bound": {
+  "calldata": "0xa9059cbb00000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000001",
+  "goplus": {
+   "flags": [],
+   "is_blackmail": false,
+   "is_contract": true,
+   "is_drainer": false,
+   "is_sanctioned": false
+  },
+  "jev": {
+   "consistency": "unclear",
+   "drainer_prob": 0.11,
+   "model": "jev-1.14.0",
+   "risk_confidence": 0.13,
+   "risk_level": "medium",
+   "via": "typesafe"
+  },
+  "latency_ms": 264.7,
+  "nonce": "0xdededededededededededededededededededededededededededededededede",
+  "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "ts": 1792456111,
+  "value": 0
+ },
+ "not_measured_blind": {
+  "calldata": "0xa9059cbb00000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000001",
+  "goplus": {
+   "unavailable": true
+  },
+  "jev": null,
+  "jev_note": "jev dict None + attempt=True (cl\u00e9s prod sur VPS)",
+  "latency_ms": 1.5,
+  "nonce": null,
+  "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "ts": 1792456229,
+  "value": 0
+ }
+}

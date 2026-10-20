@@ -601,15 +601,18 @@ def check_transaction(
         failed.append("goplus")
     if _OFAC_ERROR:
         failed.append("ofac_blocklist")
-    if jev_attempted and jev is None and not failed:
+    if jev_attempted and jev is None:
         # tentative réelle + aucune donnée = échec réseau des endpoints
-        # sémantiques. IMPORTANT (v1.3.2) : jev=None quand goplus a déjà rendu
+        # sémantiques — NOMMÉ même si une autre couche a déjà échoué : la
+        # cécité est nommée sur le fichier qui la démontre (fil erc-8004#99,
+        # retours bbv/ruiruii/holistis du 20/10).
+        # IMPORTANT (v1.3.2) : jev=None quand goplus a déjà rendu
         # un flag malveillant est un SKIP VOULU (la couche n'ajouterait rien),
         # pas une couche en échec — ne pas polluer checks_failed.
         if not (goplus.get("is_drainer") or goplus.get("is_blackmail")
                 or goplus.get("is_sanctioned")):
             failed.append("jev_semantic")
-    if jev is None and not jev_attempted and not failed:
+    if jev is None and not jev_attempted:
         # fourche self-hosted sans clés : la couche sémantique n'existe pas.
         # Règle NOT_MEASURED du fil erc-8004#99 : une couche absente ne vaut
         # pas une couche propre — c'est un échec de couche, pas un défaut du

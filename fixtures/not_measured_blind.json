@@ -5,7 +5,8 @@
   "calldata_sha256": "3574b3017b7d6a66d198a6bfbf23cae2a372c7acd6f109e9c293303d8b327043",
   "chain_id": 8453,
   "checks_failed": [
-    "goplus"
+    "goplus",
+    "jev_semantic"
   ],
   "confidence": null,
   "evaluation_status": "not-measured",
@@ -23,7 +24,7 @@
   "reasons": [
     "goplus_unavailable_fail_closed"
   ],
-  "signature": "9a0b610ac288f9585137bf8937f1870870a2a7c922eff0819f237a857566512271e3463bc1874c2eec50ca09df6543c75d165ed121fec3a04f627b03521dfb01",
+  "signature": "26af925e5e37bbc4c7ebf22cf93585a65675e0395cca2bc7416c2a3f4f972153088ca4ea8532203e5ba7a4813852f668d90928c9f0d428c824b4627bbd8de30f",
   "timestamp": 1792456229,
   "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   "value": 0,
