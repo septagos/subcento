@@ -130,6 +130,39 @@ v_nonce = eng.build_verdict(d_a1, USDC_BASE, 0, [], {"unavailable": True}, None,
 check("nonce-bound: binding contient le nonce normalise",
       v_nonce["binding"]["kind"] == "nonce-bound")
 
+# ------------------------------------------------------------ 5. plafond v1.3.2 jev
+print("[5] couche sémantique absente = jamais un SAFE implicite")
+GO_CLEAN = {"is_contract": True, "is_drainer": False, "is_blackmail": False,
+            "is_sanctioned": False, "flags": []}
+JEV_LOW = {"drainer_prob": 0.1, "risk_level": "low", "risk_confidence": 0.8,
+           "consistency": "coherent"}
+v_blind = eng.build_verdict(d_a1, USDC_BASE, 0, [], GO_CLEAN, None,
+                            checks_failed=("jev_semantic",))
+check("jev absent -> plafond CAUTION (jamais SAFE)", v_blind["verdict"] == "CAUTION")
+check("jev échoué -> status not-measured", v_blind["evaluation_status"] == "not-measured")
+check("cécité nommée dans reasons",
+      "jev_semantic_missing_cap_caution" in v_blind["reasons"])
+try:
+    VerifyKey(v_blind["verify_key"], nacl.encoding.HexEncoder).verify(
+        hashlib.sha256(canonicalize(v_blind)).digest(),
+        bytes.fromhex(v_blind["signature"]))
+    check("verdict plafonné toujours vérifiable", True)
+except Exception:
+    check("verdict plafonné toujours vérifiable", False)
+v_drain = eng.build_verdict(d_a1, USDC_BASE, 0, [],
+                            {"is_drainer": True, "flags": ["drainer"]}, None)
+check("skip jev après block déterministe = pas de pollution reasons",
+      v_drain["verdict"] == "BLOCK"
+      and "jev_semantic_missing_cap_caution" not in v_drain["reasons"])
+v_safe = eng.build_verdict(d_a1, USDC_BASE, 0, [], GO_CLEAN, JEV_LOW)
+check("jeu propre mesuré -> SAFE intact",
+      v_safe["verdict"] == "SAFE" and v_safe["evaluation_status"] == "measured")
+v_ofac = eng.build_verdict(eng.decode_calldata("0x"), "0" * 42, 10 ** 18, [],
+                           {}, None, ofac_hits=("0" * 42,))
+check("OFAC hit -> BLOCK sans cap sémantique parasite",
+      v_ofac["verdict"] == "BLOCK"
+      and "jev_semantic_missing_cap_caution" not in v_ofac["reasons"])
+
 # ------------------------------------------------------------------------ résumé
 print(f"\n{len(PASS)} pass / {len(FAIL)} fail")
 if FAIL:

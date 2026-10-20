@@ -1,0 +1,36 @@
+{
+  "binding": {
+    "kind": "shape-bound"
+  },
+  "calldata_sha256": "3574b3017b7d6a66d198a6bfbf23cae2a372c7acd6f109e9c293303d8b327043",
+  "chain_id": 8453,
+  "checks_failed": [
+    "jev_semantic"
+  ],
+  "confidence": null,
+  "evaluation_status": "not-measured",
+  "function": "transfer",
+  "goplus": {
+    "flags": [],
+    "is_blackmail": false,
+    "is_contract": true,
+    "is_drainer": false,
+    "is_sanctioned": false
+  },
+  "jev": null,
+  "latency_ms": 336.7,
+  "limits": [
+    "shows: transaction-shape risk (recipient, allowance, calldata heuristics) evaluated before execution",
+    "does not show: that any work followed the payment",
+    "does not show: counterparty honesty or producer intent"
+  ],
+  "reasons": [
+    "jev_semantic_missing_cap_caution"
+  ],
+  "signature": "c64a91ee6ba7812afc0181b52706982677f756f62c27cb3ed273f6c8e8d4c0d527359170de3e51681cf20f9e8cafb4fbce5c17a03dbadc785cc5895522d4a204",
+  "timestamp": 1792456229,
+  "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "value": 0,
+  "verdict": "CAUTION",
+  "verify_key": "99d59000e66922a9076d3910d23857574f5670561d978f57144ba278d3d50256"
+}

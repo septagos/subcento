@@ -28,7 +28,7 @@ JEV_MODEL = os.environ.get("JEV_MODEL", "jev-1.14.0")  # version épinglée, jam
 # Fallback secondaire (déprécié) :
 JEV_FALLBACK_URL = os.environ.get("JEV_FALLBACK_URL", "https://tokenra.io/v1/decisions")
 TOKENRA_API_KEY = os.environ.get("TOKENRA_API_KEY", "")  # vide = fallback désactivé
-GOPLUS_API = "https://api.gopluslabs.io/api/v1"
+GOPLUS_API = os.environ.get("GOPLUS_API", "https://api.gopluslabs.io/api/v1")
 
 # --- Blocklist OFAC locale (hors-ligne, déterministe, ~0 ms) ---
 _OFAC_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ofac_blocklist.json")
@@ -474,6 +474,16 @@ def build_verdict(
         elif jev.get("consistency") == "incoherent":
             caution = True
             reasons.append("jev_decode_incoherent")
+    elif not block:
+        # v1.3.2 — règle NOT_MEASURED du fil erc-8004#99 : une couche sémantique
+        # absente ou en échec ne devient JAMAIS un SAFE implicite. Si jev est
+        # None sans que les couches déterministes aient déjà bloqué, le verdict
+        # est plafonné à CAUTION et evaluation_status le dit ("not-measured" via
+        # checks_failed jev_semantic). Un consommateur machine qui exige une
+        # mesure complète refuse not-measured lui-même ; ici la cécité n'est
+        # au moins pas maquillée en propreté.
+        caution = True
+        reasons.append("jev_semantic_missing_cap_caution")
 
     if block:
         verdict = "BLOCK"
@@ -492,9 +502,12 @@ def build_verdict(
         binding = {"kind": "shape-bound"}
 
     # v1.2 — evaluation_status : "not-measured" si une couche de confiance
-    # requise (GoPlus, blocklist OFAC) n'a pas pu s'exécuter. Le gate BLOCK,
-    # mais le verdict distingue "dangereux" de "on n'a pas pu voir".
-    required_failed = [c for c in checks_failed if c in ("goplus", "ofac_blocklist")]
+    # requise n'a pas pu s'exécuter. Un verdict n'est pas l'absence de verdict ;
+    # un consommateur machine doit pouvoir distinguer "aveugle" de "propre".
+    # v1.3.2 — jev_semantic est une couche REQUISE au même titre que goplus :
+    # absente/échouée => jamais un "measured" implicite (fil erc-8004#99).
+    required_failed = [c for c in checks_failed
+                       if c.startswith(("goplus", "ofac_blocklist", "jev_semantic"))]
     evaluation_status = "not-measured" if required_failed else "measured"
 
     # --- Signature Ed25519 du verdict (payload canonique v1.3) ---
@@ -589,7 +602,18 @@ def check_transaction(
     if _OFAC_ERROR:
         failed.append("ofac_blocklist")
     if jev_attempted and jev is None and not failed:
-        # tentative réelle + aucune donnée = échec réseau des endpoints sémantiques
+        # tentative réelle + aucune donnée = échec réseau des endpoints
+        # sémantiques. IMPORTANT (v1.3.2) : jev=None quand goplus a déjà rendu
+        # un flag malveillant est un SKIP VOULU (la couche n'ajouterait rien),
+        # pas une couche en échec — ne pas polluer checks_failed.
+        if not (goplus.get("is_drainer") or goplus.get("is_blackmail")
+                or goplus.get("is_sanctioned")):
+            failed.append("jev_semantic")
+    if jev is None and not jev_attempted and not failed:
+        # fourche self-hosted sans clés : la couche sémantique n'existe pas.
+        # Règle NOT_MEASURED du fil erc-8004#99 : une couche absente ne vaut
+        # pas une couche propre — c'est un échec de couche, pas un défaut du
+        # client.
         failed.append("jev_semantic")
 
     # 5. Verdict final
