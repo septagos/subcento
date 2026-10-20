@@ -76,6 +76,9 @@ def check():
         verdict = check_transaction(to, calldata, value, chain_id,
                                     declared_intent=intent, nonce=nonce)
         return jsonify(verdict)
+    except ValueError as e:
+        # Entrée invalide (ex. calldata non-hex) : faute du client, pas du serveur
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

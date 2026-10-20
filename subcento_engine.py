@@ -369,6 +369,22 @@ def _normalize_nonce(nonce: str | None) -> str | None:
     return n
 
 
+def _normalize_calldata(calldata: str | None) -> str:
+    """Normalise un calldata pour hachage reproductible : minuscules, préfixe
+    0x, longueur paire, hex strictement valide. ''/None/0x → '0x' (natif).
+    Lève ValueError sur entrée non-hex (rejet 400 côté API, jamais un hash
+    construit sur des octets ambigus)."""
+    s = (calldata or "").strip().lower()
+    if not s or s == "0x":
+        return "0x"
+    if not s.startswith("0x"):
+        s = "0x" + s
+    body = s[2:]
+    if len(body) % 2 or not all(c in "0123456789abcdef" for c in body):
+        raise ValueError("calldata must be valid hex")
+    return s
+
+
 def build_verdict(
     decoded: dict,
     to: str,
@@ -391,6 +407,9 @@ def build_verdict(
       - Sinon → SAFE
     v1.2 : binding (nonce-bound vs shape-bound), evaluation_status mesuré
     ou non (règle NOT_MEASURED de la discussion erc-8004#99), limites embarquées.
+    v1.3 : + calldata_sha256 dans le canonique signé — le verdict lie le
+    calldata exact (hex normalisé), pas seulement le sélecteur (colmatage du
+    vecteur « requête mutée entre verdict et settlement », erc-8004#99).
     Le gate reste fail-closed strict : une couche injoignable donne BLOCK,
     mais le verdict dit désormais POURQUOI (dangereux vs aveugle).
     """
@@ -477,12 +496,20 @@ def build_verdict(
     required_failed = [c for c in checks_failed if c in ("goplus", "ofac_blocklist")]
     evaluation_status = "not-measured" if required_failed else "measured"
 
-    # --- Signature Ed25519 du verdict (payload canonique v1.2) ---
+    # --- Signature Ed25519 du verdict (payload canonique v1.3) ---
+    # v1.3 : calldata_sha256 — le verdict lie le calldata EXACT et pas
+    # seulement le sélecteur 4-byte (vecteur n°3 de la discussion
+    # erc-8004#99 : deux transferts même fonction/même montant mais
+    # arguments différents produisaient des verdicts signés identiques ;
+    # une requête mutée entre verdict et settlement passait tous les
+    # checks). Hachage sur hex NORMALISÉ (minuscules, 0x, pairs).
+    calldata_norm = _normalize_calldata(decoded.get("raw") or "")
     verdict_payload = {
         "verdict": verdict,
         "to": to,
         "function": decoded["function"],
         "value": int(value),
+        "calldata_sha256": hashlib.sha256(calldata_norm.encode()).hexdigest(),
         "reasons": reasons,
         "timestamp": int(time.time()),
         "chain_id": int(chain_id),

@@ -48,7 +48,7 @@ With the official x402 client, the payment is transparent — same call, paid re
 # See client_example.py for the decision-loop pattern (SAFE→sign, CAUTION→escalate, BLOCK→refuse)
 ```
 
-### Verify a verdict — in 8 lines
+### Verify a verdict — in 10 lines
 
 ```python
 import hashlib, json
@@ -56,11 +56,15 @@ from nacl.signing import VerifyKey
 from nacl.encoding import HexEncoder
 
 v = verdict  # the JSON you got back from /check
-payload = {k: v[k] for k in ("verdict", "to", "function", "reasons", "timestamp")}
+FIELDS = ("verdict", "to", "function", "value", "calldata_sha256", "reasons",
+          "timestamp", "chain_id", "binding", "evaluation_status",
+          "checks_failed", "limits")  # canonical payload v1.3 — verbatim
+payload = {k: v[k] for k in FIELDS}
 canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
 digest = hashlib.sha256(canonical.encode()).digest()
 VerifyKey(v["verify_key"], HexEncoder).verify(digest, bytes.fromhex(v["signature"]))
-# raises on any tampering; passing = this exact verdict left Subcento untouched
+# raises on any tampering; passing = this exact verdict — bound to this exact
+# calldata via calldata_sha256 (normalized lowercase hex) — left Subcento untouched
 ```
 
 ## Architecture (the honest one)
