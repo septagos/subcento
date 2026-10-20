@@ -7,7 +7,8 @@ Pipeline :
   3. Couche sémantique Jev (interprète l'intention du calldata)
   4. Verdict final : SAFE | CAUTION | BLOCK, signé Ed25519
 
-Latence cible : <100 ms (verdicts mis en cache).
+Latence mesurée (oct. 2026, Francfort) : /regime 30-140 ms ; /check ~1 s cold,
+~0.3 s warm (Jev reviens à chaque appel, seul GoPlus est cache).
 """
 
 import os
