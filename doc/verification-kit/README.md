@@ -53,9 +53,10 @@ shows this kit's verifier rejecting the same forgery.
 
 ## 3 — Reproduce the fixtures yourself
 
-Timestamps and `latency_ms` are replayed from the production run (inside the
-signed payload, hence frozen). `gen_fixtures.py` recomputes each verdict through
-this engine and re-signs the canonical payload:
+`timestamp` is inside the signed payload and frozen at its production value;
+`latency_ms` and the other informational fields (section 4) are replayed from
+the production run for context only. `gen_fixtures.py` recomputes each verdict
+through this engine and re-signs the canonical payload:
 
 ```bash
 python3 -c 'import nacl.signing; open("/tmp/test_signing.key","wb").write(nacl.signing.SigningKey.generate().encode())'
@@ -66,6 +67,20 @@ Everything identical except the `signature` and informational `verify_key`
 fields — check with e.g.
 `diff <(jq 'del(.signature,.verify_key)' -s /tmp/fx_repro/nonce_bound.json) <(jq 'del(.signature,.verify_key)' -s fixtures/nonce_bound.json)`.
 Your key, same truth.
+
+## 4 — Signed vs informational
+
+The signature covers exactly the twelve canonical payload fields — `verdict`,
+`to`, `function`, `value`, `calldata_sha256`, `reasons`, `timestamp`,
+`chain_id`, `binding`, `evaluation_status`, `checks_failed`, `limits` — and
+nothing else.
+
+Everything else a verdict file carries (`confidence`, `latency_ms`,
+`ofac_hits`, `goplus.*`, `jev.*`) is informational: never covered by the
+signature, never signed evidence. The
+signed meaning of a decision lives in `verdict`, `reasons`, `checks_failed`
+and `evaluation_status`. Citing an informational field as a signed claim is a
+misuse of the artifact, not a property of it.
 
 ## Key provenance
 
