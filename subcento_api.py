@@ -18,14 +18,14 @@ def index():
     """Page de découverte M2M (servie sans paiement via x402)."""
     return jsonify({
         "name": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.5.1",
+        "version": "1.5.2",
         "description": (
             "Verifies an on-chain transaction before an AI agent signs it. "
             "Returns SAFE | CAUTION | BLOCK with signed evidence. /regime stays "
             "under 150 ms; /check runs ~0.3 s warm, ~1 s cold (live trust-layer calls). "
             "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits. "
             "v1.3: POST /regime — signed market-stress verdict (seismograph + Jev regime). "
-            "v1.3.1: contract hardening — only /check and /regime are ever billed; unknown paths return an unpaid 404 JSON; the x402 resume guide at /x402v2.txt is free. v1.4: full free discovery surface for agents and registries — /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402. v1.5: POST /audit — signed Evidence Pack (0.05 USDC), offline-verifiable; the billed-route contract now covers /check, /regime and /audit. v1.5.1: price integrity — the unpaid 404 handler announced /audit at 0.5 USDC instead of 0.05; every served surface now states the same price."
+            "v1.3.1: contract hardening — only /check and /regime are ever billed; unknown paths return an unpaid 404 JSON; the x402 resume guide at /x402v2.txt is free. v1.4: full free discovery surface for agents and registries — /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402. v1.5: POST /audit — signed Evidence Pack (0.05 USDC), offline-verifiable; the billed-route contract now covers /check, /regime and /audit. v1.5.1: price integrity — the unpaid 404 handler announced /audit at 0.5 USDC instead of 0.05; every served surface now states the same price. v1.5.2: payment guide (/x402v2.txt, /.well-known/x402) now announces all three billed routes; history clearly separated from contract."
         ),
         "pricing_model": "x402",
         "cost_per_request_usdc": {"POST /check": "0.002", "POST /regime": "0.0001", "POST /audit": "0.05"},
@@ -96,7 +96,7 @@ def check():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "version": "1.5.1", "verify_key": VERIFY_KEY_HEX})
+    return jsonify({"status": "ok", "version": "1.5.2", "verify_key": VERIFY_KEY_HEX})
 
 
 @app.route("/regime", methods=["POST"])
@@ -227,7 +227,7 @@ AGENT_CARD = {
         "Fail-closed: unreachable trust layers yield BLOCK, never a false SAFE. "
         "Also POST /regime: signed market-stress verdict (seismograph score + Jev regime)."
     ),
-    "version": "1.5.1",
+    "version": "1.5.2",
     "url": "https://subcento.alterfield.com",
     "provider": {
         "organization": "Alterfield",
@@ -334,7 +334,7 @@ OPENAPI = {
     "openapi": "3.1.0",
     "info": {
         "title": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.5.1",
+        "version": "1.5.2",
         "contact": {
             "name": "Subcento — operated by Alterfield",
             "url": "https://subcento.alterfield.com",
