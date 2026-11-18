@@ -13,6 +13,19 @@ agent should never sign without: an independent second opinion.
 [Machine contract](https://subcento.alterfield.com/openapi.json) ·
 [llms.txt](https://subcento.alterfield.com/llms.txt)
 
+## What is billable (the whole contract)
+
+| Route | Price (USDC, Base) | What you get |
+|-------|--------------------|--------------|
+| `POST /check` | 0.002 | signed pre-flight verdict |
+| `POST /regime` | 0.0001 | signed market-stress read |
+| `POST /audit` | 0.05 | signed Evidence Pack — full service audit, offline-verifiable |
+
+Only these three routes are ever billed; any other path returns an **unpaid 404
+JSON** listing them. Free discovery: `/`, `/health`, `/openapi.json`,
+`/llms.txt`, `/x402v2.txt`, `/robots.txt`, `/sitemap.xml`,
+`/.well-known/agent-card.json`, `/.well-known/x402`.
+
 ## What runs before your signature
 
 | # | Layer | Question it answers |

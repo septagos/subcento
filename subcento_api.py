@@ -5,6 +5,8 @@ Le reverse-proxy Caddy (avec plugin x402) intercepte les requêtes HTTP 402.
 Cette API Flask sert la logique métier derrière le paywall.
 """
 
+import os
+
 from flask import Flask, request, jsonify
 from subcento_engine import check_transaction, check_market, VERIFY_KEY_HEX
 
@@ -16,16 +18,17 @@ def index():
     """Page de découverte M2M (servie sans paiement via x402)."""
     return jsonify({
         "name": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.3.0",
+        "version": "1.5.1",
         "description": (
             "Verifies an on-chain transaction before an AI agent signs it. "
             "Returns SAFE | CAUTION | BLOCK with signed evidence. /regime stays "
             "under 150 ms; /check runs ~0.3 s warm, ~1 s cold (live trust-layer calls). "
             "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits. "
-            "v1.3: POST /regime — signed market-stress verdict (seismograph + Jev regime)."
+            "v1.3: POST /regime — signed market-stress verdict (seismograph + Jev regime). "
+            "v1.3.1: contract hardening — only /check and /regime are ever billed; unknown paths return an unpaid 404 JSON; the x402 resume guide at /x402v2.txt is free. v1.4: full free discovery surface for agents and registries — /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402. v1.5: POST /audit — signed Evidence Pack (0.05 USDC), offline-verifiable; the billed-route contract now covers /check, /regime and /audit. v1.5.1: price integrity — the unpaid 404 handler announced /audit at 0.5 USDC instead of 0.05; every served surface now states the same price."
         ),
         "pricing_model": "x402",
-        "cost_per_request_usdc": {"POST /check": "0.002", "POST /regime": "0.0001"},
+        "cost_per_request_usdc": {"POST /check": "0.002", "POST /regime": "0.0001", "POST /audit": "0.05"},
         "endpoints": [
             {
                 "path": "/check",
@@ -47,8 +50,15 @@ def index():
                 "body": {
                     "live_jev": "bool (optional, default false — true refreshes the Jev classification now, ~300ms)",
                 },
+            },
+            {
+                "path": "/audit",
+                "method": "POST",
+                "description": "Signed Evidence Pack: merchant identity, kit SHA-256 integrity, on-chain proofs, market snapshot, deployment state — verifiable offline",
+                "body": {},
             }
         ],
+        "discovery_files": ["/robots.txt", "/sitemap.xml", "/.well-known/agent-card.json", "/.well-known/x402", "/llms.txt", "/openapi.json", "/x402v2.txt"],
         "verify_key": VERIFY_KEY_HEX,
     })
 
@@ -86,7 +96,7 @@ def check():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "verify_key": VERIFY_KEY_HEX})
+    return jsonify({"status": "ok", "version": "1.5.1", "verify_key": VERIFY_KEY_HEX})
 
 
 @app.route("/regime", methods=["POST"])
@@ -188,11 +198,143 @@ def favicon():
     return FAVICON, 200, {"Content-Type": "image/x-icon", "Cache-Control": "public, max-age=86400"}
 
 
+
+# --- v1.4.0 : surface de découverte M2M gratuite (aucun impact Caddy, aucune route payante touchée) ---
+
+ROBOTS_TXT = (
+    "User-agent: *\nAllow: /\n\n"
+    "# Everything needed to discover, evaluate and pay Subcento is free.\n"
+    "# Paid endpoints: POST /check, POST /regime, POST /audit (x402 v2, Base mainnet).\n"
+    "Sitemap: https://subcento.alterfield.com/sitemap.xml\n"
+)
+
+SITEMAP_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    "  <url><loc>https://subcento.alterfield.com/</loc></url>\n"
+    "  <url><loc>https://subcento.alterfield.com/llms.txt</loc></url>\n"
+    "  <url><loc>https://subcento.alterfield.com/openapi.json</loc></url>\n"
+    "  <url><loc>https://subcento.alterfield.com/x402v2.txt</loc></url>\n"
+    "</urlset>\n"
+)
+
+AGENT_CARD = {
+    "name": "Subcento",
+    "description": (
+        "Pre-flight on-chain transaction verification for AI agents. x402-paid micro-USDC "
+        "on Base mainnet; Ed25519-signed verdicts (SAFE | CAUTION | BLOCK) with per-layer "
+        "evidence (GoPlus risk, OFAC blocklist, Jev semantic intent, deterministic checks). "
+        "Fail-closed: unreachable trust layers yield BLOCK, never a false SAFE. "
+        "Also POST /regime: signed market-stress verdict (seismograph score + Jev regime)."
+    ),
+    "version": "1.5.1",
+    "url": "https://subcento.alterfield.com",
+    "provider": {
+        "organization": "Alterfield",
+        "url": "https://subcento.alterfield.com",
+        "email": "subcento@pm.me",
+    },
+    "transport": {"protocol": "HTTP+JSON", "payment": "x402 v2 per endpoint (see x402 blocks below)"},
+    "capabilities": {"signed_verdicts": True, "fail_closed": True, "streaming": False},
+    "documentation": {
+        "discovery_root": "GET / (machine-readable contract)",
+        "openapi": "GET /openapi.json",
+        "llms": "GET /llms.txt",
+        "payment_resume_guide": "GET /x402v2.txt (free, referenced by every 402 challenge)",
+        "trust_key": "GET /health (Ed25519 verify key)",
+    },
+    "skills": [
+        {
+            "id": "preflight_check",
+            "name": "Pre-flight transaction verification",
+            "summary": "Verify an EVM/Base transaction BEFORE signing; returns a signed verdict with reasons, limits and binding (nonce-bound when you send the ERC-3009 nonce).",
+            "endpoint": {"path": "/check", "method": "POST", "content_type": "application/json"},
+            "input_fields": ["to (required)", "calldata", "value", "chain_id (default 8453)", "intent", "nonce"],
+            "output": "signed verdict JSON: verdict, reasons[], binding, evaluation_status, checks_failed[], limits[], signature, verify_key",
+            "latency": "~0.3 s warm, ~1 s cold (live per-request trust-layer calls)",
+            "x402": {
+                "network": "eip155:8453", "scheme": "exact",
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                "amount_minor": "2000", "minor_units_decimals": 6,
+                "facilitator": "https://facilitator.goplausible.xyz", "max_timeout_s": 60,
+            },
+        },
+        {
+            "id": "market_regime",
+            "name": "Signed market-stress verdict",
+            "summary": "Deterministic cross-asset seismograph score (0-100) + Jev regime label (calm|volatile|stress|crisis) + 48h escalation probability, Ed25519-signed, snapshot < 30 min old.",
+            "endpoint": {"path": "/regime", "method": "POST", "content_type": "application/json"},
+            "input_fields": ["live_jev (bool, optional, default false)"],
+            "output": "signed regime verdict JSON",
+            "latency": "<150 ms",
+            "x402": {
+                "network": "eip155:8453", "scheme": "exact",
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                "amount_minor": "100", "minor_units_decimals": 6,
+                "facilitator": "https://facilitator.goplausible.xyz", "max_timeout_s": 60,
+            },
+        },
+        {
+            "id": "evidence_audit",
+            "name": "Signed Evidence Pack",
+            "summary": "Offline-verifiable dossier: merchant identity, kit SHA-256 integrity, on-chain merchant proofs, engine market snapshot, real deployment state, Ed25519 signature. Unmeasured fields stay NON_MESURE — never invented.",
+            "endpoint": {"path": "/audit", "method": "POST", "content_type": "application/json"},
+            "input_fields": [],
+            "output": "signed evidence pack JSON (sections with status MESURE | PARTIEL | NON_MESURE)",
+            "latency": "~0.2 s",
+            "x402": {
+                "network": "eip155:8453", "scheme": "exact",
+                "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                "amount_minor": "50000", "minor_units_decimals": 6,
+                "facilitator": "https://facilitator.goplausible.xyz", "max_timeout_s": 60,
+            },
+        },
+    ],
+    "free_routes": ["/", "/health", "/openapi.json", "/llms.txt", "/x402v2.txt",
+                    "/robots.txt", "/sitemap.xml", "/favicon.ico",
+                    "/.well-known/agent-card.json", "/.well-known/x402"],
+    "contract": (
+        "Only POST /check (0.002 USDC), POST /regime (0.0001 USDC) and POST /audit (0.05 USDC) are ever billed. "
+        "Any other path returns an unpaid 404 JSON describing the contract — you cannot pay for a ghost. "
+        "Never pay for discovery: everything above is free."
+    ),
+}
+
+
+@app.route("/robots.txt")
+def robots():
+    return ROBOTS_TXT, 200, {"Content-Type": "text/plain; charset=utf-8",
+                             "Cache-Control": "public, max-age=3600"}
+
+
+@app.route("/sitemap.xml")
+def sitemap():
+    return SITEMAP_XML, 200, {"Content-Type": "application/xml; charset=utf-8"}
+
+
+@app.route("/.well-known/agent-card.json")
+def agent_card():
+    """Carte d'agent pour registres agentic-web (BrickBlue et al.)."""
+    return jsonify(AGENT_CARD)
+
+
+@app.route("/.well-known/agent.json")
+def agent_json():
+    """Alias legacy recherché par les crawlers Open402 — même carte."""
+    return jsonify(AGENT_CARD)
+
+
+@app.route("/.well-known/x402")
+def wellknown_x402():
+    """Alias well-known du guide de reprise de paiement (route déjà libre)."""
+    return x402_guide()
+
+
 OPENAPI = {
     "openapi": "3.1.0",
     "info": {
         "title": "Subcento — Pre-flight Transaction Verifier for AI Agents",
-        "version": "1.3.0",
+        "version": "1.5.1",
         "contact": {
             "name": "Subcento — operated by Alterfield",
             "url": "https://subcento.alterfield.com",
@@ -211,7 +353,9 @@ OPENAPI = {
             "maxTimeout 60s) via facilitator https://facilitator.goplausible.xyz, then retry the identical request "
             "with the X-PAYMENT header. Include 'intent' to get the 3-in-1 semantic diagnostic "
             "(drainer probability, risk level, intent-match). Treat BLOCK as final; CAUTION deserves a human or a smaller probe. "
-            "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico — never pay for discovery. "
+            "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico, /x402v2.txt, /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402 — never pay for discovery. "
+            "Only /check, /regime and /audit are ever billed: any other path returns an unpaid 404 JSON. "
+            "Full payment-resume steps: GET /x402v2.txt (free). "
             "To make a verdict citable as a pre-settlement precondition, send the ERC-3009 nonce you intend to spend "
             "in the request: the signed verdict then binds to it and opens against exactly one settlement. "
             "A BLOCK whose evaluation_status is not-measured means the verifier was blind, not that you are guilty. "
@@ -243,6 +387,28 @@ OPENAPI = {
         "/llms.txt": {
             "get": {"summary": "Plain-text guide for LLM crawlers", "security": [],
                     "responses": {"200": {"description": "text/plain"}}},
+        },
+        "/x402v2.txt": {
+            "get": {"summary": "Free step-by-step payment-resume guide (referenced by every 402 challenge)",
+                    "security": [], "responses": {"200": {"description": "text/plain"}}},
+        },
+        "/favicon.ico": {
+            "get": {"summary": "Icon", "security": [], "responses": {"200": {"description": "image/x-icon"}}},
+        },
+        "/robots.txt": {
+            "get": {"summary": "Crawler policy (free)", "security": [], "responses": {"200": {"description": "text/plain"}}},
+        },
+        "/sitemap.xml": {
+            "get": {"summary": "Sitemap of free docs (free)", "security": [], "responses": {"200": {"description": "application/xml"}}},
+        },
+        "/.well-known/agent-card.json": {
+            "get": {"summary": "Agentic-web discovery card (free)", "security": [], "responses": {"200": {"description": "application/json"}}},
+        },
+        "/.well-known/agent.json": {
+            "get": {"summary": "Alias of agent-card.json (free)", "security": [], "responses": {"200": {"description": "application/json"}}},
+        },
+        "/.well-known/x402": {
+            "get": {"summary": "Payment-resume guide at well-known path (free)", "security": [], "responses": {"200": {"description": "text/plain"}}},
         },
         "/check": {
             "post": {
@@ -276,6 +442,20 @@ OPENAPI = {
                 },
                 "x-payment-info": {
                     "price": {"mode": "fixed", "currency": "USD", "amount": "0.0001"},
+                    "protocols": [{"x402": {}}],
+                },
+            }
+        },
+        "/audit": {
+            "post": {
+                "summary": "Signed Evidence Pack (paid, 0.05 USDC)",
+                "requestBody": {"required": False, "content": {"application/json": {"schema": {"type": "object"}}}},
+                "responses": {
+                    "200": {"description": "Signed evidence pack (sections status MESURE | PARTIEL | NON_MESURE)"},
+                    "402": {"description": "Payment Required"},
+                },
+                "x-payment-info": {
+                    "price": {"mode": "fixed", "currency": "USD", "amount": "0.05"},
                     "protocols": [{"x402": {}}],
                 },
             }
@@ -320,6 +500,19 @@ score (0-100, SAFE <45 ≤ CAUTION <75 ≤ BLOCK), Jev regime label
 (micro-USDC = $0.0001), same facilitator. This is aggregate market stress —
 not a price prediction, not advice.
 
+## Payment guide
+### GET /x402v2.txt (free)
+Step-by-step: decode the `Payment-Required` challenge, sign the ERC-3009
+USDC authorization, retry with `X-PAYMENT`, keep `X-PAYMENT-RESPONSE` as receipt.
+
+## Discovery files (all free)
+### GET /robots.txt · GET /sitemap.xml
+### GET /.well-known/agent-card.json (agentic-web registry card) · GET /.well-known/x402 (guide alias)
+
+## Contract
+Only POST /check and POST /regime are ever billed. Every other path returns an
+unpaid 404 JSON listing the paid routes — you cannot pay for a ghost.
+
 ## Docs
 - Root: https://subcento.alterfield.com/ (full OpenAPI-ish discovery JSON)
 
@@ -339,6 +532,38 @@ not a price prediction, not advice.
 def llms():
     return LLMS_TXT, 200, {"Content-Type": "text/plain; charset=utf-8"}
 
+
+
+X402_GUIDE_PATH = os.environ.get("SUBCENTO_X402_GUIDE", "/srv/subcento/x402v2.txt")
+
+
+@app.errorhandler(404)
+def not_found(e):
+    """Un unknown path is never billable: explicit unpaid 404 with the paid-route contract."""
+    return jsonify({
+        "error": "route does not exist — nothing was billed",
+        "paid_routes": [{"path": "/check", "method": "POST", "price_usdc": "0.002"},
+                        {"path": "/regime", "method": "POST", "price_usdc": "0.0001"},
+                        {"path": "/audit", "method": "POST", "price_usdc": "0.05"}],
+        "free_discovery": ["/", "/health", "/openapi.json", "/llms.txt", "/x402v2.txt",
+                           "/robots.txt", "/sitemap.xml", "/.well-known/agent-card.json",
+                           "/.well-known/x402"],
+    }), 404
+
+
+@app.route("/x402v2.txt")
+def x402_guide():
+    """Free plain-text payment-resume guide referenced by every 402 challenge."""
+    try:
+        with open(X402_GUIDE_PATH) as f:
+            return f.read(), 200, {"Content-Type": "text/plain; charset=utf-8"}
+    except FileNotFoundError:
+        return "guide temporarily unavailable — see /llms.txt", 503
+
+
+# --- v1.5.0 : POST /audit — Evidence Pack (x402 billed by Caddy; deploy/Caddyfile.audit.snippet) ---
+from audit_api import register_audit_routes as _reg_audit
+_reg_audit(app)
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000)
