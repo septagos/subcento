@@ -2,7 +2,7 @@
 
 **Verify before you sign. Not after.**
 
-Pre-flight transaction verification for AI agents — one `POST /check` in front of
+Pre-flight transaction verification for AI agents: one `POST /check` in front of
 every signature. Pay **0.002 USDC on Base** with [x402](https://x402.org), get back a
 **signed verdict** (`SAFE | CAUTION | BLOCK`) with per-layer evidence. No API keys,
 no signup, no humans in the loop. A machine pays a machine for the one thing an
@@ -19,7 +19,7 @@ agent should never sign without: an independent second opinion.
 |-------|--------------------|--------------|
 | `POST /check` | 0.002 | signed pre-flight verdict |
 | `POST /regime` | 0.0001 | signed market-stress read |
-| `POST /audit` | 0.05 | signed Evidence Pack — full service audit, offline-verifiable |
+| `POST /audit` | 0.05 | signed Evidence Pack: full service audit, offline-verifiable |
 
 Only these three routes are ever billed; any other path returns an **unpaid 404
 JSON** listing them. Free discovery: `/`, `/health`, `/openapi.json`,
@@ -32,20 +32,20 @@ JSON** listing them. Free discovery: `/`, `/health`, `/openapi.json`,
 |---|-------|---------------------|
 | 1 | **GoPlus** | Is this address a known drainer / risky contract? |
 | 2 | **OFAC blocklist** | Is this address sanctioned by the US Treasury? (local copy, refreshed weekly) |
-| 3 | **Jev semantic analysis** | What does the *calldata actually do* — and does it match your agent's *declared intent*? ([official TypeSafe AI System One API](https://typesafe.ai), version pinned) |
-| 4 | **Deterministic checks** | Unlimited approvals, honeypot patterns, value sanity — pure code, no model |
+| 3 | **Jev semantic analysis** | What does the *calldata actually do*, and does it match your agent's *declared intent*? ([official TypeSafe AI System One API](https://typesafe.ai), version pinned) |
+| 4 | **Deterministic checks** | Unlimited approvals, honeypot patterns, value sanity, pure code, no model |
 
-Every verdict is **Ed25519-signed**. Don't trust the service? Don't trust us —
+Every verdict is **Ed25519-signed**. Don't trust the service? Don't trust us:
 **verify the signature with the key from `/health`** and see exactly what you paid for.
 
 ## Fail-closed by design
 
-If a trust layer is unreachable, you get `BLOCK` — never a generous `SAFE`.
+If a trust layer is unreachable, you get `BLOCK`, never a generous `SAFE`.
 Subcento fails in the direction of your funds, not the direction of its uptime.
 
 ## Quickstart
 
-Discovery is free. Payment is x402 — your agent handles the 402 natively:
+Discovery is free. Payment is x402: your agent handles the 402 natively:
 
 ```bash
 curl -X POST https://subcento.alterfield.com/check \
@@ -54,14 +54,14 @@ curl -X POST https://subcento.alterfield.com/check \
 # → HTTP 402 + Payment-Required (x402 v2): 0.002 USDC, Base mainnet, 60s timeout
 ```
 
-With the official x402 client, the payment is transparent — same call, paid retry:
+With the official x402 client, the payment is transparent: same call, paid retry:
 
 ```python
 # pip install x402
 # See client_example.py for the decision-loop pattern (SAFE→sign, CAUTION→escalate, BLOCK→refuse)
 ```
 
-### Verify a verdict — in 10 lines
+### Verify a verdict in 10 lines
 
 ```python
 import hashlib, json
@@ -71,16 +71,16 @@ from nacl.encoding import HexEncoder
 v = verdict  # the JSON you got back from /check
 FIELDS = ("verdict", "to", "function", "value", "calldata_sha256", "reasons",
           "timestamp", "chain_id", "binding", "evaluation_status",
-          "checks_failed", "limits")  # canonical payload v1.3 — verbatim
+          "checks_failed", "limits")  # canonical payload v1.3, verbatim
 payload = {k: v[k] for k in FIELDS}
 canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
 digest = hashlib.sha256(canonical.encode()).digest()
 VerifyKey(v["verify_key"], HexEncoder).verify(digest, bytes.fromhex(v["signature"]))
-# raises on any tampering; passing = this exact verdict — bound to this exact
-# calldata via calldata_sha256 (normalized lowercase hex) — left Subcento untouched
+# raises on any tampering; passing = this exact verdict, bound to this exact
+# calldata via calldata_sha256 (normalized lowercase hex), left Subcento untouched
 ```
 
-## Don't trust — verify, offline
+## Don't trust? Verify, offline
 
 Every claim on this page ships as **5 production-signed fixtures plus runnable
 batteries** in [`doc/verification-kit/`](doc/verification-kit/README.md): the
@@ -91,23 +91,23 @@ your own signing key. One dependency, zero blind trust.
 ## Architecture (the honest one)
 
 - **Edge paywall, not app paywall.** Payment gating lives in Caddy via
-  `caddy-x402avm` (`deploy/Caddyfile`) — the backend never sees unpaid traffic,
+  `caddy-x402avm` (`deploy/Caddyfile`): the backend never sees unpaid traffic,
   and the Python app has zero payment code to audit.
-- **Measured latency (Oct 2026, our Frankfurt box):** `/regime` 30–140 ms;
-  `/check` ~1 s cold, ~0.3 s warm — Jev re-runs every call, GoPlus is the only
+- **Measured latency (Oct 2026, our Frankfurt box):** `/regime` 30-140 ms;
+  `/check` ~1 s cold, ~0.3 s warm. Jev re-runs every call, GoPlus is the only
   cached layer. The Jev fan-out (drainer / risk / intent) is one 3-in-1 call,
   not three, and we'd keep it that way: budget ~1 s per fresh target, not ~10.
 - **Signature key never leaves the machine it was born on.** Generated once, on the
   production host, 600 perms. Split custody by design.
 - Run everything yourself: `pip install -r requirements.txt && gunicorn subcento_api:app`,
-  bring your own [TypeSafe](https://console.typesafe.ai) key. MIT — fork the checker,
+  bring your own [TypeSafe](https://console.typesafe.ai) key. MIT: fork the checker,
   keep the verdicts honest.
 
 ## Why an agent should care
 
 One 0.002 USDC call is the cheapest insurance in agentic commerce: it is smaller
 than a single wasted signature and larger than nothing when the approval you sign
-drains your wallet. The lane is littered with pre-sign guards that went dormant —
+drains your wallet. The lane is littered with pre-sign guards that went dormant;
 this one ships signed evidence, sanctioned-address screening, and semantic intent
 analysis, and answers to machines.
 
@@ -117,4 +117,4 @@ Live on Base mainnet · indexed on [x402scan](https://x402scan.com) · discovery
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Contact: subcento@pm.me
+MIT, see [LICENSE](LICENSE). Contact: subcento@pm.me

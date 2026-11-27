@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_verify_fixtures.py — É4 OBLIGATOIRE (doctrine 20/10/26, fil erc-8004#99).
+test_verify_fixtures.py: É4 OBLIGATOIRE (doctrine 20/10/26, fil erc-8004#99).
 
 Prouve que le verificateur v2 ne tombe pas dans la faille signalee par bbv0219 :
 "verifier une signature avec la cle embarquee dans le fichier verifie laisse
@@ -125,7 +125,7 @@ def main() -> int:
     if fails:
         print(f"\n{len(fails)} test(s) ECHEUES")
         return 1
-    print("\nÉ4 — RESIGNATURE ETRANGERE REJETEE : BATTERIE VERTE")
+    print("\nÉ4: RESIGNATURE ETRANGERE REJETEE, BATTERIE VERTE")
     return 0
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ resignature par une cle etrangere. Le verificateur exige donc la cle ATTENDUE
 hors bande (--expected-verify-key) et echoue si :
   1. la cle embarquee diffeere de la cle attendue ;
   2. la signature ne porte pas sur le payload canonique (exactement la liste
-     de 12 champs du README — meme liste, meme ordre de tri, meme JSON
+     de 12 champs du README: meme liste, meme ordre de tri, meme JSON
      compact) verifiee avec la cle ATTENDUE ;
   3. la structure ment : binding.kind inconnu, nonce-bound sans nonce bytes32
      (0x + 64 hex), evaluation_status inconnu, checks_failed non trie.
@@ -31,7 +31,7 @@ from pathlib import Path
 from nacl.encoding import HexEncoder
 from nacl.signing import VerifyKey
 
-# Meme liste que README.md ("Verify a verdict — in 10 lines") — modifier l'un
+# Meme liste que README.md ("Verify a verdict in 10 lines"); modifier l'un
 # sans l'autre est volontairement un echec de cette batterie.
 FIELDS = ("verdict", "to", "function", "value", "calldata_sha256", "reasons",
           "timestamp", "chain_id", "binding", "evaluation_status",
@@ -48,7 +48,7 @@ def canonical_bytes(verdict: dict) -> bytes:
 
 
 def check_structure(verdict: dict) -> None:
-    """Invariants de forme — une fixture structurellement menteuse est
+    """Invariants de forme: une fixture structurellement menteuse est
     rejettee AVANT toute consideration de signature."""
     cd = verdict["calldata_sha256"]
     if not (isinstance(cd, str) and _HEX64.match(cd)):
@@ -78,7 +78,7 @@ def verify(verdict: dict, expected_key: str) -> None:
         raise ValueError(
             f"cle embarquee ({norm_embedded[:16]}…) != cle attendue "
             f"({norm_expected[:16]}…) : la fixture n'a pas ete produite par "
-            "le signing key annonce — ressignature probable")
+            "le signing key annonce: ressignature probable")
     digest = hashlib.sha256(canonical_bytes(verdict)).digest()
     VerifyKey(norm_expected.encode(), HexEncoder).verify(
         digest, bytes.fromhex(verdict["signature"]))
@@ -100,7 +100,7 @@ def main() -> int:
 
     if args.trust_embedded and not args.expected_verify_key:
         print("!! MODE DEV : verification contre cle EMBARQUEE. Cette voie "
-              "accepte les resignatures etangeres — ne JAMAIS s'en servir "
+              "accepte les resignatures etangeres: ne JAMAIS s'en servir "
               "pour une decision, seulement pour du debug de fixture.")
     elif not args.expected_verify_key:
         ap.error("--expected-verify-key requis (ou --trust-embedded en dev)")
@@ -133,7 +133,7 @@ def main() -> int:
     if bad:
         print(f"\n{bad} fixture(s) NON VERIFIEE(S)")
         return 1
-    print(f"\n{len(files)} fixtures verifiees hors-ligne — signatures valides "
+    print(f"\n{len(files)} fixtures verifiees hors-ligne, signatures valides "
           f"contre la cle attendue")
     return 0
 

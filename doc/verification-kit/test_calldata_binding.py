@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Batterie v1.3 — calldata_sha256 binding (colmatage du vecteur n°3, erc-8004#99).
+Batterie v1.3: calldata_sha256 binding (colmatage du vecteur n°3, erc-8004#99).
 Hors-ligne, déterministe : passe sans réseau, sans clés, sans serveur.
 Test d'INAM : tout est recompute, zero placeholder.
 """
@@ -24,7 +24,7 @@ PASS, FAIL = [], []
 
 def check(name, cond):
     (PASS if cond else FAIL).append(name)
-    print(("  ok   " if cond else "  FAIL") + f" — {name}")
+    print(("  ok   " if cond else "  FAIL") + f" {name}")
 
 
 def canonicalize(v):

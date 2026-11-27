@@ -1,8 +1,8 @@
 """
-test_jev_v2.py — Validation Jev v2 (2026-10-17)
+test_jev_v2.py: Validation Jev v2 (2026-10-17)
 API officielle TypeSafe + diagnostic 3-en-1 + fallback TokenRa.
 Exécution : .venv/bin/python test_jev_v2.py  (mocké, aucun réseau Jev réel)
-NOTE: les réglages de clés passent par setattr() — le scrubber de secrets
+NOTE: les réglages de clés passent par setattr(): le scrubber de secrets
 de la session detruisent les assignations litterales *API_KEY* au passage.
 """
 import os, tempfile
@@ -69,11 +69,11 @@ def main():
     assert e.jev_semantic_check(d, "0x", 0, []) is None
     print("5. garde sans clé                    :", "OK")
 
-    # 6. pipeline complète sans Jev — doctrine NOT_MEASURED (20/10/26, fil
+    # 6. pipeline complète sans Jev, doctrine NOT_MEASURED (20/10/26, fil
     # erc-8004#99) : une couche absente ne vaut pas une couche propre.
     # Attendu depuis v1.3.2 : CAUTION forcée par le cap "couche non mesurée",
     # JAMAIS SAFE. (L'assertion "SAFE" du 17/10 était antérieure à la règle ;
-    # elle échouait déjà sur le moteur v1.3.2 comitté — vérifié 20/10 par
+    # elle échouait déjà sur le moteur v1.3.2 comitté; vérifié 20/10 par
     # rejeu sur version HEAD pre-patch, même échec. Ce n'est pas une
     # régression du patch attribution, c'est le test qui était périmé.)
     # GoPlus stubbé net -> deterministic, zero reseau (le test dependait de
@@ -101,7 +101,7 @@ def main():
     assert v7["evaluation_status"] == "not-measured", v7["evaluation_status"]
     print("7. double cecite nommee              : OK ->", v7["verdict"], v7["checks_failed"])
 
-    print("\nDECRET 1 — JEV V2 : VALIDÉ")
+    print("\nDECRET 1: JEV V2 VALIDÉ")
 
 if __name__ == "__main__":
     main()

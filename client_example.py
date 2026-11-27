@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Client Subcento — exemple d'appel depuis un agent IA.
+Client Subcento: exemple d'appel depuis un agent IA.
 
 L'agent envoie sa transaction en attente, reçoit le verdict signé,
 et décide de signer ou non.
@@ -42,10 +42,10 @@ def agent_decision_loop(to: str, calldata: str, value: int = 0) -> bool:
         print("✅ Signing transaction...")
         return True
     elif verdict["verdict"] == "CAUTION":
-        print("⚠️  CAUTION — escalate to human for approval")
+        print("⚠️  CAUTION: escalate to human for approval")
         return False
     else:
-        print("🚫 BLOCK — refusing transaction")
+        print("🚫 BLOCK: refusing transaction")
         return False
 
 
