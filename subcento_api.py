@@ -1,5 +1,5 @@
 """
-Subcento API — Endpoint /check prêt pour x402.
+Subcento API: Endpoint /check prêt pour x402.
 
 Le reverse-proxy Caddy (avec plugin x402) intercepte les requêtes HTTP 402.
 Cette API Flask sert la logique métier derrière le paywall.
@@ -17,15 +17,15 @@ app = Flask(__name__)
 def index():
     """Page de découverte M2M (servie sans paiement via x402)."""
     return jsonify({
-        "name": "Subcento — Pre-flight Transaction Verifier for AI Agents",
+        "name": "Subcento: Pre-flight Transaction Verifier for AI Agents",
         "version": "1.5.2",
         "description": (
             "Verifies an on-chain transaction before an AI agent signs it. "
             "Returns SAFE | CAUTION | BLOCK with signed evidence. /regime stays "
             "under 150 ms; /check runs ~0.3 s warm, ~1 s cold (live trust-layer calls). "
             "v1.2: nonce-bound or shape-bound verdicts, evaluation_status, signed limits. "
-            "v1.3: POST /regime — signed market-stress verdict (seismograph + Jev regime). "
-            "v1.3.1: contract hardening — only /check and /regime are ever billed; unknown paths return an unpaid 404 JSON; the x402 resume guide at /x402v2.txt is free. v1.4: full free discovery surface for agents and registries — /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402. v1.5: POST /audit — signed Evidence Pack (0.05 USDC), offline-verifiable; the billed-route contract now covers /check, /regime and /audit. v1.5.1: price integrity — the unpaid 404 handler announced /audit at 0.5 USDC instead of 0.05; every served surface now states the same price. v1.5.2: payment guide (/x402v2.txt, /.well-known/x402) now announces all three billed routes; history clearly separated from contract."
+            "v1.3: POST /regime, signed market-stress verdict (seismograph + Jev regime). "
+            "v1.3.1: contract hardening: only /check and /regime are ever billed; unknown paths return an unpaid 404 JSON; the x402 resume guide at /x402v2.txt is free. v1.4: full free discovery surface for agents and registries: /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402. v1.5: POST /audit: signed Evidence Pack (0.05 USDC), offline-verifiable; the billed-route contract now covers /check, /regime and /audit. v1.5.1: price integrity: the unpaid 404 handler announced /audit at 0.5 USDC instead of 0.05; every served surface now states the same price. v1.5.2: payment guide (/x402v2.txt, /.well-known/x402) now announces all three billed routes; history clearly separated from contract."
         ),
         "pricing_model": "x402",
         "cost_per_request_usdc": {"POST /check": "0.002", "POST /regime": "0.0001", "POST /audit": "0.05"},
@@ -39,8 +39,8 @@ def index():
                     "calldata": "string (hex calldata, '0x' for native transfer)",
                     "value": "int (wei, optional, default 0)",
                     "chain_id": "int (optional, default 8453 = Base)",
-                    "intent": "string (optional — declared agent intent; enables 3-in-1 intent-match diagnostic)",
-                    "nonce": "string (optional — ERC-3009 bytes32 you intend to spend; verdict becomes nonce-bound)",
+                    "intent": "string (optional: declared agent intent; enables 3-in-1 intent-match diagnostic)",
+                    "nonce": "string (optional: ERC-3009 bytes32 you intend to spend; verdict becomes nonce-bound)",
                 },
             },
             {
@@ -48,13 +48,13 @@ def index():
                 "method": "POST",
                 "description": "Signed market-stress verdict: cross-asset seismograph score + Jev regime label",
                 "body": {
-                    "live_jev": "bool (optional, default false — true refreshes the Jev classification now, ~300ms)",
+                    "live_jev": "bool (optional, default false: true refreshes the Jev classification now, ~300ms)",
                 },
             },
             {
                 "path": "/audit",
                 "method": "POST",
-                "description": "Signed Evidence Pack: merchant identity, kit SHA-256 integrity, on-chain proofs, market snapshot, deployment state — verifiable offline",
+                "description": "Signed Evidence Pack: merchant identity, kit SHA-256 integrity, on-chain proofs, market snapshot, deployment state, verifiable offline",
                 "body": {},
             }
         ],
@@ -102,7 +102,7 @@ def health():
 @app.route("/regime", methods=["POST"])
 def regime():
     """
-    Endpoint payant (x402: 0.0001 USDC) — lecture signée du marché.
+    Endpoint payant (x402: 0.0001 USDC): lecture signée du marché.
     Score sismique déterministe (30 min de fraîcheur max) + classification
     de régime par Jev (TypeSafe). Fail-soft: sans Jev, evaluation_status
     = not-measured, jamais un faux SAFE.
@@ -125,7 +125,7 @@ CHECK_SCHEMA = {
         "calldata": {"type": "string", "description": "Hex calldata; '0x' for a native transfer", "default": "0x"},
         "value": {"type": "integer", "description": "Wei sent (optional, default 0)", "minimum": 0},
         "chain_id": {"type": "integer", "description": "Chain id (optional, default 8453 = Base)", "default": 8453},
-        "intent": {"type": "string", "description": "Declared agent intent — enables the Jev 3-in-1 intent-match diagnostic"},
+        "intent": {"type": "string", "description": "Declared agent intent, enables the Jev 3-in-1 intent-match diagnostic"},
         "nonce": {"type": "string", "description": "Optional ERC-3009 bytes32 nonce (0x + 64 hex) the caller intends to spend; when present the signed verdict is nonce-bound and opens against exactly one settlement", "pattern": "^0x[0-9a-fA-F]{64}$"},
     },
 }
@@ -139,11 +139,11 @@ VERDICT_SCHEMA = {
         "value": {"type": "integer", "description": "Signed: wei in the payment shape"},
         "chain_id": {"type": "integer", "description": "Signed: chain the verdict is valid on (anti cross-chain replay)"},
         "timestamp": {"type": "integer", "description": "Signed issue time, unix seconds. Ordering rule: a verdict counts as pre-flight only when strictly before the settlement block timestamp; equal does not count."},
-        "binding": {"type": "object", "description": "Signed. {kind: 'nonce-bound', nonce: '0x…64'} when the caller supplied the ERC-3009 nonce — verdict then opens against exactly one settlement, never a second identical payment. {kind: 'shape-bound'} otherwise — never upgradeable to a per-payment claim.", "properties": {"kind": {"type": "string", "enum": ["nonce-bound", "shape-bound"]}, "nonce": {"type": "string"}}},
+        "binding": {"type": "object", "description": "Signed. {kind: 'nonce-bound', nonce: '0x…64'} when the caller supplied the ERC-3009 nonce; verdict then opens against exactly one settlement, never a second identical payment. {kind: 'shape-bound'} otherwise: never upgradeable to a per-payment claim.", "properties": {"kind": {"type": "string", "enum": ["nonce-bound", "shape-bound"]}, "nonce": {"type": "string"}}},
         "evaluation_status": {"type": "string", "enum": ["measured", "not-measured"], "description": "not-measured means a required trust layer could not run (see checks_failed); a BLOCK with not-measured is gate conservatism, not evidence of danger, and must not count as a negative signal about the agent"},
         "checks_failed": {"type": "array", "items": {"type": "string"}, "description": "Layers that could not run (goplus, ofac_blocklist, jev_semantic)"},
         "limits": {"type": "array", "items": {"type": "string"}, "description": "Signed: what this verdict does and does not show"},
-        "layers": {"type": "object", "description": "Per-layer evidence (GoPlus risk, OFAC, Jev semantics, deterministic checks) — unsigned advisory detail"},
+        "layers": {"type": "object", "description": "Per-layer evidence (GoPlus risk, OFAC, Jev semantics, deterministic checks), unsigned advisory detail"},
         "signature": {"type": "string", "description": "Ed25519 signature over the canonical digest of the signed payload (verdict, to, function, value, reasons, timestamp, chain_id, binding, evaluation_status, checks_failed, limits)"},
         "verify_key": {"type": "string", "description": "Hex Ed25519 verify key (also at /health)"},
     },
@@ -181,7 +181,7 @@ REGIME_VERDICT_SCHEMA = {
 
 
 def _build_favicon() -> bytes:
-    """ICO 16x16x32 — carré vert Subcento, généré sans dépendance."""
+    """ICO 16x16x32: carré vert Subcento, généré sans dépendance."""
     w = h = 16
     px = b"".join(b"\xa0\xe5\x00\xff" * w for _ in range(h))  # BGRA #00E5A0
     andmask = b"\x00" * (h * 4)
@@ -277,7 +277,7 @@ AGENT_CARD = {
         {
             "id": "evidence_audit",
             "name": "Signed Evidence Pack",
-            "summary": "Offline-verifiable dossier: merchant identity, kit SHA-256 integrity, on-chain merchant proofs, engine market snapshot, real deployment state, Ed25519 signature. Unmeasured fields stay NON_MESURE — never invented.",
+            "summary": "Offline-verifiable dossier: merchant identity, kit SHA-256 integrity, on-chain merchant proofs, engine market snapshot, real deployment state, Ed25519 signature. Unmeasured fields stay NON_MESURE, never invented.",
             "endpoint": {"path": "/audit", "method": "POST", "content_type": "application/json"},
             "input_fields": [],
             "output": "signed evidence pack JSON (sections with status MESURE | PARTIEL | NON_MESURE)",
@@ -295,7 +295,7 @@ AGENT_CARD = {
                     "/.well-known/agent-card.json", "/.well-known/x402"],
     "contract": (
         "Only POST /check (0.002 USDC), POST /regime (0.0001 USDC) and POST /audit (0.05 USDC) are ever billed. "
-        "Any other path returns an unpaid 404 JSON describing the contract — you cannot pay for a ghost. "
+        "Any other path returns an unpaid 404 JSON describing the contract: you cannot pay for a ghost. "
         "Never pay for discovery: everything above is free."
     ),
 }
@@ -320,7 +320,7 @@ def agent_card():
 
 @app.route("/.well-known/agent.json")
 def agent_json():
-    """Alias legacy recherché par les crawlers Open402 — même carte."""
+    """Alias legacy recherché par les crawlers Open402: même carte."""
     return jsonify(AGENT_CARD)
 
 
@@ -333,10 +333,10 @@ def wellknown_x402():
 OPENAPI = {
     "openapi": "3.1.0",
     "info": {
-        "title": "Subcento — Pre-flight Transaction Verifier for AI Agents",
+        "title": "Subcento: Pre-flight Transaction Verifier for AI Agents",
         "version": "1.5.2",
         "contact": {
-            "name": "Subcento — operated by Alterfield",
+            "name": "Subcento, operated by Alterfield",
             "url": "https://subcento.alterfield.com",
             "email": "subcento@pm.me",
         },
@@ -353,7 +353,7 @@ OPENAPI = {
             "maxTimeout 60s) via facilitator https://facilitator.goplausible.xyz, then retry the identical request "
             "with the X-PAYMENT header. Include 'intent' to get the 3-in-1 semantic diagnostic "
             "(drainer probability, risk level, intent-match). Treat BLOCK as final; CAUTION deserves a human or a smaller probe. "
-            "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico, /x402v2.txt, /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402 — never pay for discovery. "
+            "Free routes: /, /health, /llms.txt, /openapi.json, /favicon.ico, /x402v2.txt, /robots.txt, /sitemap.xml, /.well-known/agent-card.json, /.well-known/x402: never pay for discovery. "
             "Only /check, /regime and /audit are ever billed: any other path returns an unpaid 404 JSON. "
             "Full payment-resume steps: GET /x402v2.txt (free). "
             "To make a verdict citable as a pre-settlement precondition, send the ERC-3009 nonce you intend to spend "
@@ -472,9 +472,9 @@ def openapi():
 LLMS_TXT = """# Subcento
 
 > Pre-flight transaction verification for AI agents. Pay with x402 (0.002 USDC on
-> Base mainnet), get a signed verdict — SAFE | CAUTION | BLOCK — with evidence in
+> Base mainnet), get a signed verdict (SAFE | CAUTION | BLOCK) with evidence in
 > /regime under 150 ms; /check ~0.3 s warm / ~1 s cold (GoPlus + Jev run live per
-> request — only GoPlus is cached). Fail-closed: if trust layers are unreachable you
+> request; only GoPlus is cached). Fail-closed: if trust layers are unreachable you
 > get BLOCK, never a false SAFE.
 
 ## Why an agent should call this before signing
@@ -483,21 +483,21 @@ calldata (Jev / TypeSafe AI), Ed25519-signed verdict verifiable with `verify_key
 
 ## Endpoints
 
-### POST /check (x402 paywall — returns HTTP 402 + Payment-Required if unpaid)
+### POST /check (x402 paywall: returns HTTP 402 + Payment-Required if unpaid)
 Body: `{"to": "0x…", "calldata": "0x…", "value": 0, "chain_id": 8453, "intent": "optional declared intent"}`
 x402 terms: scheme exact, network eip155:8453, asset USDC, amount 2000 (= $0.002),
 facilitator https://facilitator.goplausible.xyz, maxTimeout 60s.
 
-### GET / — free machine-readable discovery card
-### GET /health — free liveness + verify_key
+### GET /: free machine-readable discovery card
+### GET /health: free liveness + verify_key
 
-### POST /regime (x402 paywall — 0.0001 USDC)
+### POST /regime (x402 paywall: 0.0001 USDC)
 Body: `{}` or `{"live_jev": true}` to refresh the Jev classification now.
 Returns a signed market-stress verdict: deterministic cross-asset seismograph
 score (0-100, SAFE <45 ≤ CAUTION <75 ≤ BLOCK), Jev regime label
 (calm|volatile|stress|crisis) and 48h escalation noul, snapshot freshness
 (`age_seconds`, always <1800). x402 terms: network eip155:8453, amount 100
-(micro-USDC = $0.0001), same facilitator. This is aggregate market stress —
+(micro-USDC = $0.0001), same facilitator. This is aggregate market stress:
 not a price prediction, not advice.
 
 ## Payment guide
@@ -511,7 +511,7 @@ USDC authorization, retry with `X-PAYMENT`, keep `X-PAYMENT-RESPONSE` as receipt
 
 ## Contract
 Only POST /check and POST /regime are ever billed. Every other path returns an
-unpaid 404 JSON listing the paid routes — you cannot pay for a ghost.
+unpaid 404 JSON listing the paid routes: you cannot pay for a ghost.
 
 ## Docs
 - Root: https://subcento.alterfield.com/ (full OpenAPI-ish discovery JSON)
@@ -521,7 +521,7 @@ unpaid 404 JSON listing the paid routes — you cannot pay for a ghost.
 - `intent` mismatch alone ⇒ CAUTION (anti false-positive), drainer probability > 0.7 ⇒ BLOCK.
 - v1.2: send the ERC-3009 `nonce` you intend to spend and the signed verdict is `nonce-bound`
   (opens against exactly one settlement; a shape-bound verdict never upgrades).
-- `evaluation_status: not-measured` on a BLOCK means a trust layer could not run — gate
+- `evaluation_status: not-measured` on a BLOCK means a trust layer could not run: gate
   conservatism, not evidence. Never cite it as a negative signal about the agent.
 - Signature covers: verdict, to, function, value, reasons, timestamp, chain_id, binding,
   evaluation_status, checks_failed, limits. Everything else in the response is advisory detail.
@@ -541,7 +541,7 @@ X402_GUIDE_PATH = os.environ.get("SUBCENTO_X402_GUIDE", "/srv/subcento/x402v2.tx
 def not_found(e):
     """Un unknown path is never billable: explicit unpaid 404 with the paid-route contract."""
     return jsonify({
-        "error": "route does not exist — nothing was billed",
+        "error": "route does not exist, nothing was billed",
         "paid_routes": [{"path": "/check", "method": "POST", "price_usdc": "0.002"},
                         {"path": "/regime", "method": "POST", "price_usdc": "0.0001"},
                         {"path": "/audit", "method": "POST", "price_usdc": "0.05"}],
@@ -558,10 +558,10 @@ def x402_guide():
         with open(X402_GUIDE_PATH) as f:
             return f.read(), 200, {"Content-Type": "text/plain; charset=utf-8"}
     except FileNotFoundError:
-        return "guide temporarily unavailable — see /llms.txt", 503
+        return "guide temporarily unavailable, see /llms.txt", 503
 
 
-# --- v1.5.0 : POST /audit — Evidence Pack (x402 billed by Caddy; deploy/Caddyfile.audit.snippet) ---
+# --- v1.5.0 : POST /audit: Evidence Pack (x402 billed by Caddy; deploy/Caddyfile.audit.snippet) ---
 from audit_api import register_audit_routes as _reg_audit
 _reg_audit(app)
 

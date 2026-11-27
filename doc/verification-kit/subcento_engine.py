@@ -1,5 +1,5 @@
 """
-Subcento Engine — Pré-vérification ultra-rapide de transactions pour agents IA.
+Subcento Engine: Pré-vérification ultra-rapide de transactions pour agents IA.
 
 Pipeline :
   1. Décode le calldata (4-byte selector → fonction connue + paramètres)
@@ -20,7 +20,7 @@ from typing import Any, Optional
 import requests
 
 # --- Configuration ---
-# API OFFICIELLE TypeSafe (depuis 2026-10-17) — schéma identique à l'ancien,
+# API OFFICIELLE TypeSafe (depuis 2026-10-17): schéma identique à l'ancien,
 # TokenRa dégradé en fallback secondaire (revendeur, pas de SLA/SOC2).
 TYPESAFE_API_URL = "https://api.typesafe.ai/v1/systemone"
 TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
@@ -132,7 +132,7 @@ def decode_calldata(calldata: str) -> dict:
 # ---------------------------------------------------------------------------
 
 _GOPLUS_CACHE: dict[str, tuple[float, dict]] = {}
-_GOPLUS_TTL = 300  # secondes — les labels drainer/sanction bougent peu
+_GOPLUS_TTL = 300  # secondes: les labels drainer/sanction bougent peu
 
 # Champs réels de l'API address_security considérés comme malveillants (valeur "1")
 _GOPLUS_MALICIOUS_FIELDS = (
@@ -244,7 +244,7 @@ def _jev_post(url: str, key: str, payload: dict, timeout: float = 2.5) -> dict:
 def jev_semantic_check(decoded: dict, to: str, value: int, flags: list[str],
                        declared_intent: str | None = None) -> dict | None:
     """
-    Couche sémantique Jev (TypeSafe AI officiel — depuis 2026-10-17).
+    Couche sémantique Jev (TypeSafe AI officiel, depuis 2026-10-17).
     Diagnostic 3-en-1 en un seul pass (coût latence quasi constant, doc officielle) :
       1. is_drainer_or_scam (noul)   -> probabilité drainer 0-1
       2. risk_level (choice)         -> low/medium/high + confiance calibrée
@@ -303,8 +303,8 @@ def jev_semantic_check(decoded: dict, to: str, value: int, flags: list[str],
             "type": "choice",
             "criteria": {
                 "low": "Standard DeFi interaction (swap, deposit, verified contract)",
-                "medium": "Ambiguous — needs human review or extra checks",
-                "high": "Likely drainer or malicious — should be blocked",
+                "medium": "Ambiguous: needs human review or extra checks",
+                "high": "Likely drainer or malicious: should be blocked",
             },
         },
         **third_q,
@@ -408,7 +408,7 @@ def build_verdict(
       - Sinon → SAFE
     v1.2 : binding (nonce-bound vs shape-bound), evaluation_status mesuré
     ou non (règle NOT_MEASURED de la discussion erc-8004#99), limites embarquées.
-    v1.3 : + calldata_sha256 dans le canonique signé — le verdict lie le
+    v1.3 : + calldata_sha256 dans le canonique signé: le verdict lie le
     calldata exact (hex normalisé), pas seulement le sélecteur (colmatage du
     vecteur « requête mutée entre verdict et settlement », erc-8004#99).
     Le gate reste fail-closed strict : une couche injoignable donne BLOCK,
@@ -475,7 +475,7 @@ def build_verdict(
             caution = True
             reasons.append("jev_decode_incoherent")
     elif not block:
-        # v1.3.2 — règle NOT_MEASURED du fil erc-8004#99 : une couche sémantique
+        # v1.3.2: règle NOT_MEASURED du fil erc-8004#99 : une couche sémantique
         # absente ou en échec ne devient JAMAIS un SAFE implicite. Si jev est
         # None sans que les couches déterministes aient déjà bloqué, le verdict
         # est plafonné à CAUTION et evaluation_status le dit ("not-measured" via
@@ -492,7 +492,7 @@ def build_verdict(
     else:
         verdict = "SAFE"
 
-    # v1.2 — binding : un verdict avec nonce ERC-3009 valide est "nonce-bound"
+    # v1.2, binding : un verdict avec nonce ERC-3009 valide est "nonce-bound"
     # (ouvrable contre exactement un règlement), sinon "shape-bound" (jamais
     # promu, convention SHAPE_BOUND de la discussion erc-8004#99).
     nonce_norm = _normalize_nonce(nonce)
@@ -501,17 +501,17 @@ def build_verdict(
     else:
         binding = {"kind": "shape-bound"}
 
-    # v1.2 — evaluation_status : "not-measured" si une couche de confiance
+    # v1.2, evaluation_status : "not-measured" si une couche de confiance
     # requise n'a pas pu s'exécuter. Un verdict n'est pas l'absence de verdict ;
     # un consommateur machine doit pouvoir distinguer "aveugle" de "propre".
-    # v1.3.2 — jev_semantic est une couche REQUISE au même titre que goplus :
+    # v1.3.2, jev_semantic est une couche REQUISE au même titre que goplus :
     # absente/échouée => jamais un "measured" implicite (fil erc-8004#99).
     required_failed = [c for c in checks_failed
                        if c.startswith(("goplus", "ofac_blocklist", "jev_semantic"))]
     evaluation_status = "not-measured" if required_failed else "measured"
 
     # --- Signature Ed25519 du verdict (payload canonique v1.3) ---
-    # v1.3 : calldata_sha256 — le verdict lie le calldata EXACT et pas
+    # v1.3 : calldata_sha256, le verdict lie le calldata EXACT et pas
     # seulement le sélecteur 4-byte (vecteur n°3 de la discussion
     # erc-8004#99 : deux transferts même fonction/même montant mais
     # arguments différents produisaient des verdicts signés identiques ;
@@ -585,7 +585,7 @@ def check_transaction(
         verdict["latency_ms"] = round((time.time() - t0) * 1000, 1)
         return verdict
 
-    # 3. GoPlus — TOUJOURS (fail-closed strict : pas de SAFE sans couche de
+    # 3. GoPlus: TOUJOURS (fail-closed strict : pas de SAFE sans couche de
     # confiance consultée ; l'OFAC hit a déjà court-circuité au-dessus)
     goplus = check_goplus_malicious(to, chain_id)
 
@@ -595,7 +595,7 @@ def check_transaction(
     if not goplus.get("is_drainer") and not goplus.get("is_blackmail") and not goplus.get("is_sanctioned"):
         jev = jev_semantic_check(decoded, to, value, flags, declared_intent)
 
-    # 4b. v1.2 — quelles couches n'ont pas pu s'exécuter (règle NOT_MEASURED)
+    # 4b. v1.2, quelles couches n'ont pas pu s'exécuter (règle NOT_MEASURED)
     failed = []
     if goplus.get("unavailable"):
         failed.append("goplus")
@@ -603,19 +603,19 @@ def check_transaction(
         failed.append("ofac_blocklist")
     if jev_attempted and jev is None:
         # tentative réelle + aucune donnée = échec réseau des endpoints
-        # sémantiques — NOMMÉ même si une autre couche a déjà échoué : la
+        # sémantiques, NOMMÉ même si une autre couche a déjà échoué : la
         # cécité est nommée sur le fichier qui la démontre (fil erc-8004#99,
         # retours bbv/ruiruii/holistis du 20/10).
         # IMPORTANT (v1.3.2) : jev=None quand goplus a déjà rendu
         # un flag malveillant est un SKIP VOULU (la couche n'ajouterait rien),
-        # pas une couche en échec — ne pas polluer checks_failed.
+        # pas une couche en échec, ne pas polluer checks_failed.
         if not (goplus.get("is_drainer") or goplus.get("is_blackmail")
                 or goplus.get("is_sanctioned")):
             failed.append("jev_semantic")
     if jev is None and not jev_attempted:
         # fourche self-hosted sans clés : la couche sémantique n'existe pas.
         # Règle NOT_MEASURED du fil erc-8004#99 : une couche absente ne vaut
-        # pas une couche propre — c'est un échec de couche, pas un défaut du
+        # pas une couche propre: c'est un échec de couche, pas un défaut du
         # client.
         failed.append("jev_semantic")
 
@@ -629,7 +629,7 @@ def check_transaction(
 
 
 # ---------------------------------------------------------------------------
-# 5. /regime — marché lu par Jev + score sismique déterministe (v1.3, 19/10/26)
+# 5. /regime: marché lu par Jev + score sismique déterministe (v1.3, 19/10/26)
 # ---------------------------------------------------------------------------
 # Le capteur armée (seismo, cycle 30 min) écrit etat.json sur ce VPS.
 # /regime vend une lecture SIGNÉE de ce snapshot : score déterministe (arithmo
@@ -709,7 +709,7 @@ def check_market(live_jev: bool = False) -> dict:
     age = int(dt.datetime.now(dt.timezone.utc).timestamp() - snap_dt.timestamp())
 
     checks_failed = [] if jev else ["jev_semantic"]
-    # courbe d'escalade — accepte les deux orthographes stockées (escal48h legacy, escalade_*)
+    # courbe d'escalade: accepte les deux orthographes stockées (escal48h legacy, escalade_*)
     curve = {
         "h1": (jev or {}).get("escalade_1h"),
         "h4": (jev or {}).get("escalade_4h"),
