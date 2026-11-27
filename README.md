@@ -1,5 +1,7 @@
 # Subcento
 
+*Where AI gains autonomy, trust must be engineered.*
+
 **Verify before you sign. Not after.**
 
 Pre-flight transaction verification for AI agents: one `POST /check` in front of
